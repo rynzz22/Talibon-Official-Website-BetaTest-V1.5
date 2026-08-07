@@ -16,8 +16,11 @@ const DEFAULT_POSTER_URL = "https://images.unsplash.com/photo-1507525428034-b723
 const Hero: React.FC<HeroProps> = ({ overrideTitle, overrideSubtitle }) => {
   const { t, language } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
 
   const [isMuted, setIsMuted] = useState<boolean>(true);
+  const userWantsAudioRef = useRef<boolean>(false);
+  const isHeroInViewRef = useRef<boolean>(true);
   const videoUrl = OFFICIAL_TALIBON_VIDEO_URL;
 
   useEffect(() => {
@@ -26,20 +29,69 @@ const Hero: React.FC<HeroProps> = ({ overrideTitle, overrideSubtitle }) => {
     }
   }, [isMuted]);
 
+  // IntersectionObserver to detect when Hero section is in view vs scrolled away
+  useEffect(() => {
+    const sectionEl = sectionRef.current;
+    if (!sectionEl) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const inView = entry.isIntersecting;
+          isHeroInViewRef.current = inView;
+
+          if (!inView) {
+            // User scrolled away from Hero section -> automatically mute audio
+            if (videoRef.current) {
+              videoRef.current.muted = true;
+            }
+            setIsMuted(true);
+            window.dispatchEvent(new CustomEvent('hero-audio-sync', { detail: { muted: true } }));
+          } else {
+            // User scrolled back into Hero section -> restore audio if user enabled it
+            if (userWantsAudioRef.current && videoRef.current) {
+              videoRef.current.muted = false;
+              videoRef.current.play().then(() => {
+                setIsMuted(false);
+                window.dispatchEvent(new CustomEvent('hero-audio-sync', { detail: { muted: false } }));
+              }).catch(() => {
+                setIsMuted(true);
+                window.dispatchEvent(new CustomEvent('hero-audio-sync', { detail: { muted: true } }));
+              });
+            }
+          }
+        });
+      },
+      { threshold: 0.15 }
+    );
+
+    observer.observe(sectionEl);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     const handleAudioToggle = (e: Event) => {
       const customEvt = e as CustomEvent;
       if (typeof customEvt.detail?.muted === 'boolean') {
         const nextMuted = customEvt.detail.muted;
-        setIsMuted(nextMuted);
-        if (videoRef.current) {
-          videoRef.current.muted = nextMuted;
-          if (!nextMuted) {
-            videoRef.current.play().catch(() => {
-              setIsMuted(true);
-              window.dispatchEvent(new CustomEvent('hero-audio-sync', { detail: { muted: true } }));
-            });
+        userWantsAudioRef.current = !nextMuted;
+
+        if (!nextMuted && isHeroInViewRef.current && videoRef.current) {
+          videoRef.current.muted = false;
+          videoRef.current.play().then(() => {
+            setIsMuted(false);
+            window.dispatchEvent(new CustomEvent('hero-audio-sync', { detail: { muted: false } }));
+          }).catch(() => {
+            setIsMuted(true);
+            userWantsAudioRef.current = false;
+            window.dispatchEvent(new CustomEvent('hero-audio-sync', { detail: { muted: true } }));
+          });
+        } else {
+          setIsMuted(true);
+          if (videoRef.current) {
+            videoRef.current.muted = true;
           }
+          window.dispatchEvent(new CustomEvent('hero-audio-sync', { detail: { muted: true } }));
         }
       }
     };
@@ -49,7 +101,7 @@ const Hero: React.FC<HeroProps> = ({ overrideTitle, overrideSubtitle }) => {
   }, []);
 
   return (
-    <section id="home" className="relative min-h-screen w-full overflow-hidden flex flex-col items-start justify-center pt-28 sm:pt-36 lg:pt-40 pb-12 sm:pb-16 lg:pb-20 px-0">
+    <section ref={sectionRef} id="home" className="relative min-h-screen w-full overflow-hidden flex flex-col items-start justify-center pt-28 sm:pt-36 lg:pt-40 pb-12 sm:pb-16 lg:pb-20 px-0">
       {/* Background Image / Video Stream */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat bg-slate-900"
