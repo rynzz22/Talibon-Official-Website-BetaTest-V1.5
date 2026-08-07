@@ -1,0 +1,100 @@
+================================================================================
+MUNICIPALITY OF TALIBON - TECHNICAL ARCHITECTURE & BACKEND GUIDE
+================================================================================
+
+This guide provides an internal overview of the full-stack architecture, 
+the core backend services, and how the frontend interacts with the system.
+
+--------------------------------------------------------------------------------
+1. ARCHITECTURE OVERVIEW
+--------------------------------------------------------------------------------
+The application is a Full-Stack TypeScript project using:
+- Frontend: React 18 + Vite + Tailwind CSS.
+- Backend: Node.js (NestJS-style dependency injection) using Express.
+- Database/Auth: Supabase (PostgreSQL + GoTrue).
+- Payments: Xendit Integration.
+- Hosting: Google Cloud Run.
+
+Entry Points:
+- Client: /src/main.tsx (Initializes React)
+- Server: /server.ts (Express server that boots the NestJS backend)
+
+--------------------------------------------------------------------------------
+2. BACKEND SERVICES (src/server)
+--------------------------------------------------------------------------------
+
+A. SupabaseService (src/server/supabase.service.ts)
+--------------------------------------------------
+Role: Managed administrative access to the Supabase database.
+- Key Function: getClient()
+- Mechanism: Uses the high-privileged SUPABASE_SERVICE_ROLE_KEY. 
+- Safety: Implements "Lazy Initialization". If keys are missing, it won't crash the 
+  server at startup, but will throw a 500 error if a restricted route is accessed.
+
+B. PaymentsService (src/server/api/payments/payments.service.ts)
+--------------------------------------------------------------
+Role: Handles Xendit Invoice generation.
+- Function: createCheckoutSession(itemName, amount, successUrl, cancelUrl)
+- Mechanism:
+  1. Validates input (item names, PHP currency, and amount limits).
+  2. Calls Xendit's Invoice SDK to create a specialized payment link.
+  3. Returns a unique sessionId and a redirect URL.
+- Safety: Rounding logic prevents float inaccuracies (e.g., fractional centavos).
+
+--------------------------------------------------------------------------------
+3. FRONTEND API SERVICES (src/services)
+--------------------------------------------------------------------------------
+
+api.ts (src/services/api.ts)
+---------------------------
+Role: The central hub for all data fetching from the Supabase public API.
+- Logic: Implements an internal 5-minute cache (CACHE_DURATION).
+- Mechanism:
+  - Check: getCacheKey(table, slug) is generated.
+  - Verify: If Cache-Hit and Timestamp < 5m, return cached data immediately.
+  - Fetch: If Cache-Miss, query Supabase .eq("slug", slug).
+  - Store: Save successful response back to local Map.
+
+--------------------------------------------------------------------------------
+4. GLOBAL STATE & CONTEXTS (src/contexts)
+--------------------------------------------------------------------------------
+
+A. LanguageContext (src/contexts/LanguageContext.tsx)
+----------------------------------------------------
+Role: Manages localization (English / Cebuano).
+- State: 'en' | 'ceb'.
+- helper: t(key) returns the translated string based on the active language.
+- Persistence: Saves the user's preference to localStorage.
+
+B. SupabaseAuthContext (src/contexts/SupabaseAuthContext.tsx)
+-----------------------------------------------------------
+Role: Manages user login sessions.
+- State: user (Auth user) and profile (Custom database data).
+- listeners: Uses onAuthStateChanged to sync login state across all tabs.
+
+--------------------------------------------------------------------------------
+5. SECURITY & VULNERABILITY PREVENTION
+--------------------------------------------------------------------------------
+
+- XSS Prevention: Avoids dangerouslySetInnerHTML. Uses whitespace-pre-line 
+  for text rendering.
+- CSRF/Key Safety: Sensitive keys (XENDIT_SECRET_KEY, SERVICE_ROLE_KEY) are 
+  NEVER sent to the browser. They stay strictly in the /src/server logic.
+- Route Guarding: Admin routes (/admin) and gated services check the 
+  authenticated user ID against database permissions.
+- Fail-Fast Patterns: Services check for environment variable presence 
+  before execution to prevent ambiguous execution states.
+
+--------------------------------------------------------------------------------
+6. CORE PAGES & COMPONENTS
+--------------------------------------------------------------------------------
+
+- Home.tsx: Heavy use of modular components (Hero, Tourism, Services).
+- TourismMapPage.tsx: Hosts the Leaflet-based InteractiveMap component.
+- ContentPage.tsx: A reusable "container" page that takes any API service 
+  and renders the content dynamically, reducing code duplication.
+- Navbar.tsx: A 3-tier navigation system (Utility, Branding, Secondary).
+
+================================================================================
+END OF GUIDE
+================================================================================

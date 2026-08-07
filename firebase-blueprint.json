@@ -1,0 +1,106 @@
+{
+  "entities": {
+    "News": {
+      "title": "News Article",
+      "description": "News, advisories, and updates for the municipality.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Headline of the news" },
+        "content": { "type": "string", "description": "Full text of the article" },
+        "summary": { "type": "string", "description": "Short summary for previews" },
+        "category": { "type": "string", "enum": ["ARTICLE", "ADVISORY", "DISASTER", "UPDATE", "GALLERY", "COMMUNITY", "NOTICE", "FORM"], "description": "Type of news" },
+        "imageUrl": { "type": "string", "format": "url", "description": "Main image for the news" },
+        "fileUrl": { "type": "string", "format": "url", "description": "Link to a downloadable file (for forms)" },
+        "date": { "type": "string", "format": "date", "description": "Publication date" },
+        "author": { "type": "string", "description": "Author of the post" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "category", "date"]
+    },
+    "Resolution": {
+      "title": "Legislative Resolution",
+      "description": "Official resolutions passed by the Sangguniang Bayan.",
+      "type": "object",
+      "properties": {
+        "no": { "type": "string", "description": "Resolution number" },
+        "date": { "type": "string", "description": "Date approved (MM/DD/YYYY)" },
+        "author": { "type": "string", "description": "Author or sponsor" },
+        "title": { "type": "string", "description": "Title of the resolution" },
+        "fileUrl": { "type": "string", "format": "url", "description": "Link to the PDF document" }
+      },
+      "required": ["no", "date", "title"]
+    },
+    "Official": {
+      "title": "Municipal Official",
+      "description": "Members of the municipal government for the organizational chart.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the official" },
+        "role": { "type": "string", "description": "Official designation/title" },
+        "level": { "type": "integer", "description": "Hierarchy level (1: Mayor, 2: Admin/SB, 3: Dept)" },
+        "order": { "type": "integer", "description": "Display order within the level" }
+      },
+      "required": ["name", "role", "level"]
+    },
+    "User": {
+      "title": "Admin User",
+      "description": "Authorized administrators for the CMS.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "editor"] },
+        "uid": { "type": "string" }
+      },
+      "required": ["email", "role", "uid"]
+    },
+    "Ordinance": {
+      "title": "Municipal Ordinance",
+      "description": "Official municipal ordinances passed by the Sangguniang Bayan.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the ordinance" },
+        "year": { "type": "string", "description": "Year of enactment (e.g., '2025')" },
+        "fileUrl": { "type": "string", "format": "url", "description": "Link to the PDF document" },
+        "fileSize": { "type": "string", "description": "Size of the file (e.g., '2 MB')" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "year", "fileUrl"]
+    },
+    "Meeting": {
+      "title": "Meeting Summary",
+      "description": "Summarized meeting minutes generated from audio recording.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the meeting" },
+        "date": { "type": "string", "format": "date-time" },
+        "summary": { "type": "string", "description": "Summarized points" },
+        "transcription": { "type": "string", "description": "Full transcription (optional)" },
+        "author": { "type": "string", "description": "Admin who recorded the meeting" }
+      },
+      "required": ["title", "date", "summary"]
+    },
+    "Navigation": {
+      "title": "Navigation Sub-link",
+      "description": "Customizable sub-links for the main navigation menu.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Display name of the sub-link" },
+        "href": { "type": "string", "description": "URL or path for the link" },
+        "section": { "type": "string", "enum": ["NEWS", "ABOUT", "EXECUTIVE", "LEGISLATIVE", "TRANSPARENCY", "TOURISM", "FORMS"], "description": "Main section this link belongs to" },
+        "order": { "type": "integer", "description": "Display order within the section" },
+        "isExternal": { "type": "boolean", "description": "Whether the link is an external URL" },
+        "isHash": { "type": "boolean", "description": "Whether the link is a hash link" }
+      },
+      "required": ["name", "href", "section", "order"]
+    }
+  },
+  "firestore": {
+    "/news/{newsId}": { "schema": "News", "description": "Collection of news posts" },
+    "/resolutions/{resId}": { "schema": "Resolution", "description": "Collection of resolutions" },
+    "/officials/{offId}": { "schema": "Official", "description": "Collection of officials" },
+    "/ordinances/{ordId}": { "schema": "Ordinance", "description": "Collection of municipal ordinances" },
+    "/users/{userId}": { "schema": "User", "description": "Admin user profiles" },
+    "/meetings/{meetingId}": { "schema": "Meeting", "description": "Collection of meeting summaries" },
+    "/navigation/{navId}": { "schema": "Navigation", "description": "Collection of navigation sub-links" }
+  }
+}

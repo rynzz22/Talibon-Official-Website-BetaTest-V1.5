@@ -1,0 +1,317 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@700;800;900&family=Outfit:wght@700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+:root {
+  --brand-bg: #F8FAFC;
+  --brand-surface: #FFFFFF;
+  --brand-border: #E2E8F0;
+  --brand-text: #0F172A;
+  --brand-muted: #64748B;
+}
+
+.dark {
+  --brand-bg: #F8FAFC;
+  --brand-surface: #FFFFFF;
+  --brand-border: #E2E8F0;
+  --brand-text: #0F172A;
+  --brand-muted: #64748B;
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-hero: "Montserrat", "Outfit", "Plus Jakarta Sans", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-brand-primary: var(--primary, #3A8FC2);
+  --color-brand-secondary: var(--secondary, #4FA8D8);
+  --color-brand-accent: var(--accent, #6FBCE0);
+  --color-brand-bg: var(--brand-bg);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-border: var(--brand-border);
+  --color-brand-text: var(--brand-text);
+  --color-brand-muted: var(--brand-muted);
+
+  --color-dark-bg: #020617;
+  --color-dark-surface: #0F172A;
+  --color-dark-border: #1E293B;
+  --color-dark-text: #F8FAFC;
+  --color-dark-muted: #A1B0CB;
+
+  --navbar-height-mobile: 140px;
+  --navbar-height-desktop: 204px;
+}
+
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-brand-bg text-brand-text antialiased transition-colors duration-500;
+    selection-color: #3A8FC2;
+    selection-background: rgba(79, 168, 216, 0.15);
+  }
+
+  body::selection,
+  body *::selection {
+    background: rgba(79, 168, 216, 0.2);
+    color: #3A8FC2;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #E2E8F0;
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #CBD5E1;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: #1E293B;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #334155;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+
+  /* ─── Card variants ─── */
+  .minimal-card {
+    @apply bg-brand-surface rounded-xl sm:rounded-2xl transition-all duration-500;
+    @apply hover:bg-white hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.06)];
+    @apply dark:bg-dark-surface dark:hover:bg-dark-surface/80;
+    @apply dark:border dark:border-dark-border;
+  }
+
+  .pro-card {
+    @apply bg-white border border-brand-border rounded-xl sm:rounded-2xl transition-all duration-300;
+    @apply hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.06)];
+    @apply dark:bg-dark-surface dark:border-dark-border;
+  }
+
+  .civic-card {
+    @apply bg-white border border-brand-border rounded-xl sm:rounded-2xl transition-all duration-300;
+    @apply hover:shadow-md hover:-translate-y-0.5;
+    @apply dark:bg-dark-surface dark:border-dark-border;
+  }
+
+  /* ─── Buttons ─── */
+  .minimal-button-primary {
+    @apply px-5 sm:px-6 py-2.5 sm:py-3 bg-brand-primary text-white font-bold text-xs tracking-widest;
+    @apply rounded-xl hover:bg-brand-primary/90 active:scale-95 transition-all duration-300;
+    @apply flex items-center justify-center gap-2.5 uppercase;
+    @apply focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2;
+  }
+
+  .minimal-button-outline {
+    @apply px-5 sm:px-6 py-2.5 sm:py-3 border border-brand-primary/50 text-brand-primary font-extrabold text-xs tracking-widest;
+    @apply rounded-xl hover:bg-brand-primary hover:text-white active:scale-95 transition-all duration-300;
+    @apply flex items-center justify-center gap-2.5 uppercase;
+    @apply dark:border-dark-border dark:text-dark-text dark:hover:bg-brand-primary;
+    @apply focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2;
+  }
+
+  .pro-button {
+    @apply px-5 sm:px-6 py-2.5 sm:py-3 bg-brand-text text-white font-black text-[10px] tracking-widest uppercase;
+    @apply rounded-xl hover:bg-brand-primary active:scale-95 transition-all duration-300;
+    @apply flex items-center justify-center gap-2;
+    @apply focus-visible:ring-2 focus-visible:ring-brand-text focus-visible:ring-offset-2;
+  }
+
+  .civic-button-primary {
+    @apply px-5 sm:px-6 py-2.5 sm:py-3 bg-brand-primary text-white font-black text-[10px] tracking-widest uppercase;
+    @apply rounded-xl hover:bg-brand-primary/90 active:scale-95 transition-all;
+    @apply flex items-center justify-center gap-2;
+    @apply disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  /* ─── Typography helpers ─── */
+  .glass-panel {
+    @apply bg-white/85 backdrop-blur-3xl border border-white/30 shadow-xl shadow-black/5;
+    @apply dark:bg-dark-bg/80 dark:border-dark-border;
+  }
+
+  .section-label {
+    display: none !important;
+  }
+
+  .section-title {
+    @apply text-xl md:text-2xl lg:text-[28px] font-bold text-brand-text tracking-tight mb-3 sm:mb-3.5 font-display leading-tight;
+    @apply dark:text-dark-text;
+  }
+
+  .card-title {
+    @apply text-base lg:text-[17px] font-semibold text-brand-text font-display leading-snug;
+    @apply dark:text-dark-text;
+  }
+
+  .body-text {
+    @apply text-xs sm:text-sm font-normal text-brand-muted leading-relaxed;
+    @apply dark:text-dark-muted;
+  }
+
+  /* ─── Content page layout helpers ─── */
+
+  /* For pages that need to account for the fixed navbar */
+  .page-content {
+    padding-top: var(--navbar-height-mobile);
+  }
+
+  @media (min-width: 1024px) {
+    .page-content {
+      padding-top: var(--navbar-height-desktop);
+    }
+  }
+
+  /* ─── Form utilities ─── */
+  .form-input {
+    @apply w-full bg-brand-bg border border-brand-border rounded-xl py-2 px-3 sm:px-3.5;
+    @apply font-semibold text-xs sm:text-sm text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary/20;
+    @apply focus:border-brand-primary/30 transition-all;
+    @apply dark:bg-dark-surface dark:border-dark-border dark:text-dark-text;
+  }
+
+  .form-label {
+    @apply text-[10px] font-bold text-brand-muted uppercase tracking-wider block mb-1;
+  }
+
+  /* ─── Screen reader only ─── */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /* ─── Scrollbar utility ─── */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--color-brand-border);
+    border-radius: 10px;
+  }
+}
+
+@layer utilities {
+  /* 1. Tone down oversized border radii for a crisper, more professional dashboard aesthetic */
+  .rounded-\[3rem\], .rounded-\[2\.5rem\], .rounded-\[2rem\] {
+    border-radius: 1.25rem !important;
+  }
+  @media (min-width: 768px) {
+    .rounded-3xl {
+      border-radius: 1rem !important;
+    }
+  }
+
+  /* 2. Proportionally reduce oversized container widths so content feels less stretched and lighter on large screens */
+  @media (min-width: 1024px) {
+    .max-w-screen-2xl {
+      max-width: 82rem !important;
+    }
+    .max-w-7xl {
+      max-width: 68rem !important;
+    }
+    .max-w-6xl {
+      max-width: 58rem !important;
+    }
+    .max-w-5xl {
+      max-width: 50rem !important;
+    }
+    .max-w-4xl {
+      max-width: 42rem !important;
+    }
+    .max-w-3xl {
+      max-width: 35rem !important;
+    }
+  }
+
+  /* 3. Proportionally decrease vertical section padding, margins, gaps, and card padding by ~20-25% */
+  @media (min-width: 768px) {
+    /* Section padding */
+    .py-32 { padding-top: 4rem !important; padding-bottom: 4rem !important; }
+    .py-24 { padding-top: 3.25rem !important; padding-bottom: 3.25rem !important; }
+    .py-20 { padding-top: 2.75rem !important; padding-bottom: 2.75rem !important; }
+    .py-16 { padding-top: 2.25rem !important; padding-bottom: 2.25rem !important; }
+    .py-14 { padding-top: 1.875rem !important; padding-bottom: 1.875rem !important; }
+    .py-12 { padding-top: 1.625rem !important; padding-bottom: 1.625rem !important; }
+
+    .pt-32 { padding-top: 4rem !important; }
+    .pb-32 { padding-bottom: 4rem !important; }
+    .pt-24 { padding-top: 3.25rem !important; }
+    .pb-24 { padding-bottom: 3.25rem !important; }
+    .pt-20 { padding-top: 2.75rem !important; }
+    .pb-20 { padding-bottom: 2.75rem !important; }
+    .pt-16 { padding-top: 2.25rem !important; }
+    .pb-16 { padding-bottom: 2.25rem !important; }
+    .pt-12 { padding-top: 1.625rem !important; }
+    .pb-12 { padding-bottom: 1.625rem !important; }
+
+    /* Vertical margins */
+    .mb-24 { margin-bottom: 3.25rem !important; }
+    .mb-20 { margin-bottom: 2.75rem !important; }
+    .mb-16 { margin-bottom: 2.25rem !important; }
+    .mb-12 { margin-bottom: 1.75rem !important; }
+    .mb-10 { margin-bottom: 1.5rem !important; }
+    .mt-20 { margin-top: 2.75rem !important; }
+    .mt-16 { margin-top: 2.25rem !important; }
+    .mt-12 { margin-top: 1.75rem !important; }
+
+    /* Grid and flex spacing */
+    .gap-24 { gap: 3.25rem !important; }
+    .gap-20 { gap: 2.75rem !important; }
+    .gap-16 { gap: 2.25rem !important; }
+    .gap-12 { gap: 1.75rem !important; }
+    .gap-10 { gap: 1.5rem !important; }
+    .gap-8  { gap: 1.25rem !important; }
+
+    /* Card internal padding */
+    .p-16 { padding: 2.5rem !important; }
+    .p-12 { padding: 2rem !important; }
+    .p-10 { padding: 1.625rem !important; }
+    .p-8  { padding: 1.375rem !important; }
+    .px-12 { padding-left: 2rem !important; padding-right: 2rem !important; }
+    .py-12 { padding-top: 2rem !important; padding-bottom: 2rem !important; }
+    .px-10 { padding-left: 1.625rem !important; padding-right: 1.625rem !important; }
+    .py-10 { padding-top: 1.625rem !important; padding-bottom: 1.625rem !important; }
+    .px-8  { padding-left: 1.375rem !important; padding-right: 1.375rem !important; }
+    .py-8  { padding-top: 1.375rem !important; padding-bottom: 1.375rem !important; }
+  }
+
+  /* 4. Refine typography scale on medium and large screens to avoid oversized headings */
+  @media (min-width: 768px) {
+    .text-7xl, .md\:text-7xl, .lg\:text-7xl { font-size: 3.25rem !important; line-height: 1.08 !important; }
+    .text-6xl, .md\:text-6xl, .lg\:text-6xl { font-size: 2.75rem !important; line-height: 1.1 !important; }
+    .text-5xl, .md\:text-5xl, .lg\:text-5xl { font-size: 2.25rem !important; line-height: 1.15 !important; }
+    .text-4xl, .md\:text-4xl, .lg\:text-4xl { font-size: 1.875rem !important; line-height: 1.2 !important; }
+    .text-3xl, .md\:text-3xl, .lg\:text-3xl { font-size: 1.5rem !important; line-height: 1.25 !important; }
+  }
+}

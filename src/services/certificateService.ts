@@ -1,0 +1,569 @@
+import { supabase, isSupabaseConfigured } from "../lib/supabase";
+import { logCmsAction } from "./cmsService";
+import { isMockAllowed } from "../lib/mode";
+
+export interface CertificateRequest {
+  id?: string;
+  ticketId: string;
+  documentType: string;
+  barangay: string;
+  fullName: string;
+  email: string;
+  mobileNumber: string;
+  purpose: string;
+  attachments: string[];
+  submittedAt: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+  history?: {
+    id?: string;
+    status: string;
+    remarks: string | null;
+    createdAt: string;
+  }[];
+}
+
+// Local Storage key for fallback requests when Supabase is unreachable or in mock mode
+const LOCAL_REQUESTS_KEY = "talibon_local_certificate_requests";
+
+export function getLocalRequests(): CertificateRequest[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_REQUESTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalRequest(req: CertificateRequest): void {
+  try {
+    const existing = getLocalRequests();
+    const filtered = existing.filter(r => r.ticketId !== req.ticketId);
+    filtered.unshift(req);
+    localStorage.setItem(LOCAL_REQUESTS_KEY, JSON.stringify(filtered));
+  } catch (e) {
+    console.warn("[CertificateService] Failed to save local request fallback:", e);
+  }
+}
+
+// Generate unique Ticket ID matching custom format per document type
+function generateTicketId(documentType: string): string {
+  const prefix = documentType.toLowerCase().includes("cedula") 
+    ? "CTC" 
+    : documentType.toLowerCase().includes("business")
+    ? "BPLO"
+    : documentType.toLowerCase().includes("building")
+    ? "ENG"
+    : documentType.toLowerCase().includes("zoning")
+    ? "MPDO"
+    : documentType.toLowerCase().includes("barangay")
+    ? "BRGY"
+    : "TLB";
+  const year = new Date().getFullYear();
+  const random = Math.floor(100000 + Math.random() * 900000); // 6-digit random number
+  return `${prefix}-${year}-${random}`;
+}
+
+// Map the DB snake_case columns back to the frontend CertificateRequest interface
+function mapDbToRequest(row: any, history: any[] = []): CertificateRequest {
+  return {
+    id: row.id,
+    ticketId: row.ticket_id,
+    documentType: row.document_type,
+    barangay: row.barangay_id || "Poblacion",
+    fullName: row.full_name,
+    email: row.email,
+    mobileNumber: row.mobile_number || "",
+    purpose: row.purpose || "",
+    attachments: row.attachments || [],
+    submittedAt: row.submitted_at || row.created_at,
+    status: row.status,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    history: history.map((h: any) => ({
+      id: h.id,
+      status: h.status,
+      remarks: h.remarks,
+      createdAt: h.created_at
+    }))
+  };
+}
+
+// Map frontend status string to official PostgreSQL Enum type status values
+function mapStatusToDb(status: string): string {
+  const upper = status.trim().toUpperCase();
+  if (upper === "SUBMITTED" || upper === "PENDING") return "Submitted";
+  if (upper === "ASSIGNED") return "Assigned";
+  if (upper === "PROCESSING" || upper === "PREPARING" || upper === "IN_PROGRESS") return "Processing";
+  if (upper === "RETURNED") return "Returned";
+  if (upper === "APPROVED" || upper === "READY") return "Approved";
+  if (upper === "REJECTED") return "Rejected";
+  if (upper === "CLAIMED" || upper === "COMPLETED") return "Completed";
+  return "Submitted";
+}
+
+// Helper to log email notification attempts inside audit_logs table
+async function logEmailAttempt(
+  userEmail: string,
+  action: "EMAIL_SENT" | "EMAIL_FAILED",
+  requestId: string,
+  ticketId: string,
+  recipient: string,
+  status: string,
+  errorMessage?: string
+): Promise<void> {
+  const email = userEmail || "system@talibon.gov.ph";
+  const dataPayload = {
+    request_id: requestId,
+    ticket_id: ticketId,
+    recipient: recipient,
+    status: status,
+    ...(errorMessage ? { error_message: errorMessage } : {})
+  };
+
+  try {
+    const { error } = await supabase.from("audit_logs").insert([{
+      user_email: email,
+      action: action as any,
+      target_table: "certificate_requests",
+      target_id: requestId,
+      new_data: dataPayload
+    }]);
+    if (error) throw error;
+  } catch (err: any) {
+    console.warn("[CertificateService] Failed to insert email audit log:", err.message || err);
+  }
+}
+
+export const certificateService = {
+  /**
+   * Submit a certificate request directly to public.certificate_requests
+   */
+  async submitRequest(payload: Omit<CertificateRequest, "ticketId" | "submittedAt" | "status">): Promise<CertificateRequest> {
+    const ticketId = generateTicketId(payload.documentType);
+    const now = new Date().toISOString();
+
+    if (!isSupabaseConfigured) {
+      throw new Error("Supabase is unconfigured. Production application requires an active database connection.");
+    }
+
+    const insertPayload = {
+      ticket_id: ticketId,
+      document_type: payload.documentType,
+      barangay_id: payload.barangay || "Poblacion",
+      full_name: payload.fullName,
+      email: payload.email || "",
+      mobile_number: payload.mobileNumber || "",
+      purpose: payload.purpose || "",
+      attachments: payload.attachments || [],
+      status: "Submitted",
+      submitted_at: now
+    };
+
+    console.log(`[CertificateService] Submitting request to public.certificate_requests with tracking code: ${ticketId}`);
+
+    // Insert directly into public.certificate_requests (V4 primary interface)
+    let createdData: any = null;
+    const { data: crData, error: crError } = await supabase
+      .from("certificate_requests")
+      .insert([insertPayload])
+      .select()
+      .maybeSingle();
+
+    if (crData) {
+      createdData = crData;
+      console.log(`[CertificateService] Successfully inserted into public.certificate_requests (ID: ${crData.id})`);
+    } else {
+      console.warn("[CertificateService] Insert to public.certificate_requests returned empty or error:", crError?.message || crError);
+      // Fallback insert to service_requests table
+      const { data: srData, error: srError } = await supabase
+        .from("service_requests")
+        .insert([insertPayload])
+        .select()
+        .maybeSingle();
+
+      if (srError || !srData) {
+        console.error("[CertificateService] Failed to insert into service_requests fallback:", srError);
+        throw new Error(crError?.message || srError?.message || "Failed to save application to database.");
+      }
+      createdData = srData;
+    }
+
+    // Insert initial record into workflow_history
+    if (createdData?.id) {
+      try {
+        await supabase.from("workflow_history").insert({
+          request_id: createdData.id,
+          status: "Submitted",
+          remarks: "Application received and registered in municipal e-services queue."
+        });
+        console.log(`[CertificateService] Logged initial workflow_history entry for request ${createdData.id}`);
+      } catch (wfErr: any) {
+        console.warn("[CertificateService] Initial workflow_history insert warning:", wfErr?.message || wfErr);
+      }
+
+      try {
+        await supabase.from("service_request_history").insert({
+          request_id: createdData.id,
+          status: "Submitted",
+          remarks: "Application received and registered in municipal e-services queue."
+        });
+      } catch (srhErr: any) {
+        console.warn("[CertificateService] Initial service_request_history insert warning:", srhErr?.message || srhErr);
+      }
+    }
+
+    const mapped = mapDbToRequest(createdData, [{
+      id: "hist-1",
+      status: "Submitted",
+      remarks: "Application received and registered in municipal e-services queue.",
+      createdAt: now
+    }]);
+
+    saveLocalRequest(mapped);
+    return mapped;
+  },
+
+  /**
+   * Get request details by tracking_code / ticket ID from public.certificate_requests with workflow_history
+   */
+  async getRequestStatus(trackingCode: string): Promise<CertificateRequest | null> {
+    const code = trackingCode ? trackingCode.trim() : "";
+    if (!code) {
+      console.warn("[Tracking Audit] Empty tracking code supplied.");
+      return null;
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code);
+    console.log(`[Tracking Audit] Searching public.certificate_requests for tracking code: "${code}" (isUuid=${isUuid})`);
+
+    if (!isSupabaseConfigured) {
+      console.error("[Tracking Audit] Supabase client is not configured.");
+      throw new Error("Database connection unconfigured. Live tracking requires database access.");
+    }
+
+    let requestData: any = null;
+
+    // Query 1: Search public.certificate_requests by ticket_id column
+    try {
+      const { data, error } = await supabase
+        .from("certificate_requests")
+        .select("*")
+        .or(`ticket_id.ilike.${code},ticket_id.eq.${code}`)
+        .maybeSingle();
+
+      if (error) {
+        console.warn(`[Tracking Audit] ticket_id query error on public.certificate_requests:`, {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+      } else if (data) {
+        requestData = data;
+        console.log(`[Tracking Audit] Match found in public.certificate_requests via ticket_id:`, data.id);
+      }
+    } catch (e: any) {
+      console.warn(`[Tracking Audit] Exception during ticket_id query:`, e.message || e);
+    }
+
+    // Query 2: Try tracking_code column if ticket_id produced no match
+    if (!requestData) {
+      try {
+        const { data, error } = await supabase
+          .from("certificate_requests")
+          .select("*")
+          .or(`tracking_code.ilike.${code},tracking_code.eq.${code}`)
+          .maybeSingle();
+
+        if (error) {
+          console.warn(`[Tracking Audit] tracking_code query error on public.certificate_requests:`, {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint
+          });
+        } else if (data) {
+          requestData = data;
+          console.log(`[Tracking Audit] Match found in public.certificate_requests via tracking_code:`, data.id);
+        }
+      } catch (e: any) {
+        console.warn(`[Tracking Audit] Exception during tracking_code query:`, e.message || e);
+      }
+    }
+
+    // Query 3: Search service_requests table directly if public.certificate_requests view missed
+    if (!requestData) {
+      try {
+        const { data, error } = await supabase
+          .from("service_requests")
+          .select("*")
+          .or(`ticket_id.ilike.${code},ticket_id.eq.${code}`)
+          .maybeSingle();
+
+        if (!error && data) {
+          requestData = data;
+          console.log(`[Tracking Audit] Match found in service_requests table via ticket_id:`, data.id);
+        }
+      } catch (e: any) {
+        console.warn(`[Tracking Audit] Exception during service_requests search:`, e.message || e);
+      }
+    }
+
+    // Query 4: Search by UUID id if code matches UUID pattern
+    if (!requestData && isUuid) {
+      try {
+        const { data, error } = await supabase
+          .from("certificate_requests")
+          .select("*")
+          .eq("id", code)
+          .maybeSingle();
+
+        if (data) {
+          requestData = data;
+          console.log(`[Tracking Audit] Match found in public.certificate_requests via UUID id:`, data.id);
+        }
+      } catch (e: any) {
+        console.warn(`[Tracking Audit] Exception during UUID search:`, e.message || e);
+      }
+    }
+
+    // Diagnostic logging if record is not found
+    if (!requestData) {
+      console.warn(`[Tracking Audit] Result: Not Found for tracking code "${code}". Possible causes: 1) No record matches this code, 2) Row Level Security (RLS) policy on public.certificate_requests is restricting public read access, 3) Code typo.`);
+      return null;
+    }
+
+    // Query related workflow_history records
+    let historyData: any[] = [];
+    try {
+      const { data: wfData, error: wfError } = await supabase
+        .from("workflow_history")
+        .select("*")
+        .eq("request_id", requestData.id)
+        .order("created_at", { ascending: false });
+
+      if (wfError) {
+        console.warn(`[Tracking Audit] workflow_history query error for request ${requestData.id}:`, wfError.message);
+      } else if (wfData && wfData.length > 0) {
+        historyData = wfData;
+        console.log(`[Tracking Audit] Loaded ${wfData.length} workflow_history records for request ${requestData.id}`);
+      }
+    } catch (e: any) {
+      console.warn(`[Tracking Audit] Exception loading workflow_history:`, e.message || e);
+    }
+
+    // Fallback to service_request_history if workflow_history returned 0 rows
+    if (historyData.length === 0) {
+      try {
+        const { data: srhData, error: srhError } = await supabase
+          .from("service_request_history")
+          .select("*")
+          .eq("request_id", requestData.id)
+          .order("created_at", { ascending: false });
+
+        if (!srhError && srhData && srhData.length > 0) {
+          historyData = srhData;
+          console.log(`[Tracking Audit] Loaded ${srhData.length} service_request_history records for request ${requestData.id}`);
+        }
+      } catch (e: any) {
+        console.warn(`[Tracking Audit] Exception loading service_request_history:`, e.message || e);
+      }
+    }
+
+    return mapDbToRequest(requestData, historyData);
+  },
+
+  /**
+   * Fetch all requests from Supabase certificate_requests table (for Admin view)
+   */
+  async getAllRequests(): Promise<CertificateRequest[]> {
+    if (!isSupabaseConfigured) {
+      console.warn("[CertificateService] Supabase not configured for getAllRequests");
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("certificate_requests")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      let listData = data;
+      if (error || !listData) {
+        const { data: srData } = await supabase
+          .from("service_requests")
+          .select("*")
+          .order("created_at", { ascending: false });
+        listData = srData;
+      }
+
+      if (listData && Array.isArray(listData)) {
+        let historyData: any[] = [];
+        const { data: wfData } = await supabase
+          .from("workflow_history")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (wfData) {
+          historyData = wfData;
+        } else {
+          const { data: srhData } = await supabase
+            .from("service_request_history")
+            .select("*")
+            .order("created_at", { ascending: false });
+          if (srhData) historyData = srhData;
+        }
+
+        return listData.map((requestData: any) => {
+          const itemHistory = historyData 
+            ? historyData.filter((h: any) => h.request_id === requestData.id)
+            : [];
+          return mapDbToRequest(requestData, itemHistory);
+        });
+      }
+    } catch (e: any) {
+      console.error("[CertificateService] getAllRequests failed:", e.message || e);
+    }
+
+    return [];
+  },
+
+  /**
+   * Transition request status and log updates directly in Supabase
+   */
+  async updateRequestStatus(
+    requestId: string,
+    status: string,
+    remarks: string,
+    userEmail: string,
+    notifyEmail: boolean = true,
+    notifySms: boolean = false,
+    saveTimeline: boolean = true
+  ): Promise<boolean> {
+    try {
+      const dbStatus = mapStatusToDb(status);
+      const now = new Date().toISOString();
+
+      let updateError: any = null;
+
+      const { error: srError } = await supabase
+        .from("service_requests")
+        .update({
+          status: dbStatus as any,
+          updated_at: now
+        })
+        .eq("id", requestId);
+
+      if (srError) {
+        const { error: crError } = await supabase
+          .from("certificate_requests")
+          .update({
+            status: dbStatus as any
+          })
+          .eq("id", requestId);
+
+        updateError = crError;
+      }
+
+      if (saveTimeline) {
+        try {
+          await supabase.from("service_request_history").insert({
+            request_id: requestId,
+            status: dbStatus,
+            remarks: remarks || `Status updated to ${status}`
+          });
+        } catch (histErr) {
+          try {
+            await supabase.from("workflow_history").insert({
+              request_id: requestId,
+              status: dbStatus,
+              remarks: remarks || `Status updated to ${status}`
+            });
+          } catch (wfErr) {
+            console.warn("[CertificateService] Workflow history insert skipped:", wfErr);
+          }
+        }
+      }
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      await logCmsAction(userEmail, `UPDATE_STATUS_${status}`, "certificate_requests", requestId);
+
+      if (notifyEmail || notifySms) {
+        (async () => {
+          let ticketId = "";
+          let recipientEmail = "";
+          let recipientName = "";
+          let documentType = "";
+          let recipientMobile = "";
+
+          try {
+            const { data: requestDetails, error: fetchErr } = await supabase
+              .from("certificate_requests")
+              .select("ticket_id, document_type, full_name, email, mobile_number")
+              .eq("id", requestId)
+              .maybeSingle();
+
+            if (fetchErr) throw fetchErr;
+            if (!requestDetails) throw new Error("Request details not found in database");
+
+            ticketId = requestDetails.ticket_id || "";
+            recipientEmail = requestDetails.email || "";
+            recipientName = requestDetails.full_name || "";
+            documentType = requestDetails.document_type || "";
+            recipientMobile = requestDetails.mobile_number || "";
+
+            const { data: edgeData, error: edgeError } = await supabase.functions.invoke("send-status-email", {
+              body: {
+                requestId,
+                ticketId,
+                status: dbStatus,
+                remarks: remarks || "",
+                recipientEmail,
+                recipientName,
+                documentType,
+                recipientMobile,
+                notifyEmail,
+                notifySms
+              }
+            });
+
+            if (edgeError) throw edgeError;
+
+            if (notifyEmail && edgeData?.success) {
+              await logEmailAttempt(userEmail, "EMAIL_SENT", requestId, ticketId, recipientEmail, dbStatus);
+            } else if (notifyEmail) {
+              await logEmailAttempt(userEmail, "EMAIL_FAILED", requestId, ticketId, recipientEmail, dbStatus, edgeData?.error || "Unknown edge error");
+            }
+          } catch (err: any) {
+            console.warn("[CertificateService] Async notification dispatcher failed:", err.message || err);
+          }
+        })();
+      }
+
+      return true;
+    } catch (e: any) {
+      console.warn("[CertificateService] updateRequestStatus remote update failed, updating local fallback:", e.message || e);
+      // Fallback: update in local storage if present
+      const localReqs = getLocalRequests();
+      const localMatch = localReqs.find(r => r.id === requestId || r.ticketId === requestId);
+      if (localMatch) {
+        localMatch.status = status;
+        localMatch.history = localMatch.history || [];
+        localMatch.history.unshift({
+          id: "hist-" + Date.now(),
+          status: status,
+          remarks: remarks || `Status updated to ${status}`,
+          createdAt: new Date().toISOString()
+        });
+        saveLocalRequest(localMatch);
+        return true;
+      }
+    }
+    return false;
+  }
+};

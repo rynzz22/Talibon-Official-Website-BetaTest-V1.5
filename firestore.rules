@@ -1,0 +1,158 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: news
+    // Fields: title (string), content (string), category (string), imageUrl (string), date (string), author (string), createdAt (timestamp)
+    //
+    // Collection: resolutions
+    // Fields: no (string), date (string), author (string), title (string), fileUrl (string)
+    //
+    // Collection: officials
+    // Fields: name (string), role (string), level (number), order (number)
+    //
+    // Collection: ordinances
+    // Fields: title (string), year (string), fileUrl (string), fileSize (string), createdAt (timestamp)
+    //
+    // Collection: meetings
+    // Fields: title (string), date (timestamp), summary (string), transcription (string), author (string)
+    //
+    // Collection: navigation
+    // Fields: name (string), href (string), section (string), order (number), isExternal (bool), isHash (bool)
+    //
+    // Collection: users
+    // Fields: email (string), role (string), uid (string)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "labradarenz@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidString(field, min, max) {
+      return request.resource.data[field] is string && 
+             request.resource.data[field].size() >= min && 
+             request.resource.data[field].size() <= max;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidNews() {
+      return hasRequiredFields(['title', 'content', 'category', 'date']) &&
+             isValidString('title', 1, 200) &&
+             isValidString('content', 1, 10000) &&
+             isValidOptionalString('summary', 0, 1000) &&
+             isValidOptionalString('imageUrl', 0, 1000) &&
+             isValidOptionalString('fileUrl', 0, 1000) &&
+             request.resource.data.category in ['ARTICLE', 'ADVISORY', 'DISASTER', 'UPDATE', 'GALLERY', 'COMMUNITY', 'NOTICE', 'FORM'];
+    }
+
+    function isValidResolution() {
+      return hasRequiredFields(['no', 'date', 'title']) &&
+             isValidString('no', 1, 20) &&
+             isValidString('title', 1, 500);
+    }
+
+    function isValidOfficial() {
+      return hasRequiredFields(['name', 'role', 'level']) &&
+             isValidString('name', 1, 100) &&
+             isValidString('role', 1, 100) &&
+             request.resource.data.level is number;
+    }
+
+    function isValidOrdinance() {
+      return hasRequiredFields(['title', 'year', 'fileUrl']) &&
+             isValidString('title', 1, 500) &&
+             isValidString('year', 4, 4);
+    }
+
+    function isValidMeeting() {
+      return hasRequiredFields(['title', 'date', 'summary']) &&
+             isValidString('title', 1, 200) &&
+             isValidString('summary', 1, 10000);
+    }
+
+    function isValidNavigation() {
+      return hasRequiredFields(['name', 'href', 'section', 'order']) &&
+             isValidString('name', 1, 100) &&
+             isValidString('href', 1, 500) &&
+             request.resource.data.section in ['NEWS', 'ABOUT', 'EXECUTIVE', 'LEGISLATIVE', 'TRANSPARENCY', 'TOURISM', 'FORMS'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /news/{newsId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidNews();
+      allow delete: if isAdmin();
+    }
+
+    match /resolutions/{resId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidResolution();
+      allow delete: if isAdmin();
+    }
+
+    match /officials/{offId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidOfficial();
+      allow delete: if isAdmin();
+    }
+
+    match /ordinances/{ordId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidOrdinance();
+      allow delete: if isAdmin();
+    }
+
+    match /meetings/{meetingId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin() && isValidMeeting();
+      allow delete: if isAdmin();
+    }
+
+    match /navigation/{navId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidNavigation();
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}
