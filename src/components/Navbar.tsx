@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "motion/react";
-import { Menu, X, Globe, ChevronDown, ArrowUpRight, Phone, Mail, MapPin, Search, Accessibility, Bell, Clock, LogIn, LayoutDashboard, LogOut, User } from "lucide-react";
+import { Menu, X, Globe, ChevronDown, ArrowUpRight, Phone, Mail, MapPin, Search, Accessibility, Bell, Clock, LogIn, LayoutDashboard, LogOut, User, Volume2, VolumeX } from "lucide-react";
 import { useState, useEffect } from "react";
 import NotificationBell from "./NotificationBell";
 import NotificationDrawer from "./NotificationDrawer";
@@ -16,6 +16,24 @@ export default function Navbar() {
   const { language, setLanguage, t } = useLanguage();
   const { user, profile, signOut, state } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [isAudioMuted, setIsAudioMuted] = useState(true);
+
+  useEffect(() => {
+    const handleAudioSync = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      if (typeof customEvt.detail?.muted === 'boolean') {
+        setIsAudioMuted(customEvt.detail.muted);
+      }
+    };
+    window.addEventListener('hero-audio-sync', handleAudioSync);
+    return () => window.removeEventListener('hero-audio-sync', handleAudioSync);
+  }, []);
+
+  const toggleAudio = () => {
+    const nextMuted = !isAudioMuted;
+    setIsAudioMuted(nextMuted);
+    window.dispatchEvent(new CustomEvent('hero-audio-toggle', { detail: { muted: nextMuted } }));
+  };
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [dynamicNavLinks, setDynamicNavLinks] = useState<any[]>([]);
   const location = useLocation();
@@ -296,6 +314,18 @@ export default function Navbar() {
                 <NotificationBell onClick={() => setIsNotificationOpen(true)} />
               </ErrorBoundary>
               <button className="hover:text-brand-primary text-brand-text transition-colors"><Accessibility size={14} /></button>
+              <button 
+                onClick={toggleAudio}
+                title={isAudioMuted ? "Unmute Audio" : "Mute Audio"}
+                aria-label={isAudioMuted ? "Unmute Audio" : "Mute Audio"}
+                className="hover:text-brand-primary text-brand-text transition-colors p-0.5 flex items-center justify-center"
+              >
+                {!isAudioMuted ? (
+                  <Volume2 size={14} className="text-brand-primary animate-pulse" />
+                ) : (
+                  <VolumeX size={14} className="text-brand-text/70 hover:text-brand-text" />
+                )}
+              </button>
             </div>
           </div>
         </div>
