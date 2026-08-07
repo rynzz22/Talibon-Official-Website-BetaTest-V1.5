@@ -302,16 +302,6 @@ const Hero: React.FC<HeroProps> = ({ overrideTitle, overrideSubtitle }) => {
                 <Smartphone size={15} className="stroke-[2] shrink-0" />
                 <span>Municipal Profile</span>
               </Link>
-
-              {/* Quick Sound Toggle CTA */}
-              <button
-                onClick={toggleMute}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 h-10 bg-white/15 hover:bg-white/25 backdrop-blur-xl border border-white/30 text-white font-bold text-xs tracking-wider rounded-xl transition-all duration-300 uppercase shadow-md hover:-translate-y-0.5 active:translate-y-0 font-display"
-                style={{ fontFamily: "'Outfit', sans-serif" }}
-              >
-                {!isMuted ? <Volume2 size={16} className="text-emerald-400" /> : <VolumeX size={16} />}
-                <span>{isMuted ? "Enable Music/Sound" : "Mute Sound"}</span>
-              </button>
             </div>
 
             {/* Quick Links */}
