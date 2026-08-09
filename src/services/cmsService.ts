@@ -5,7 +5,7 @@ import { tourismService } from "./tourismService";
 import { downloadablesService } from "./downloadablesService";
 import { servicesCmsService } from "./servicesCmsService";
 import { isMockAllowed } from "../lib/mode";
-//manual deployment test
+
 // Interfaces matching database columns
 export interface NewsItem {
   id: string;
@@ -591,7 +591,7 @@ export const cmsService = {
             name: d.name,
             role: d.role,
             level: d.level || 3,
-            display_order: d.display_order || 0,
+            display_order: d.display_order && d.display_order >= 1 ? d.display_order : 1,
             image_url: d.image_url || "",
             biography: d.biography || "",
             contact_info: d.contact_info || "",
@@ -615,11 +615,42 @@ export const cmsService = {
 
   async createOfficial(item: Omit<OfficialItem, "id">, userEmail: string): Promise<OfficialItem> {
     const deptId = item.department_id || (item.department && item.department.trim() !== "" ? item.department.trim() : null);
+
+    let displayOrder = Number(item.display_order);
+
+    if (isSupabaseConfigured) {
+      if (!displayOrder || displayOrder <= 0) {
+        try {
+          const { data: maxRow } = await supabase
+            .from("officials")
+            .select("display_order")
+            .order("display_order", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (maxRow && typeof maxRow.display_order === "number" && maxRow.display_order >= 1) {
+            displayOrder = maxRow.display_order + 1;
+          } else {
+            displayOrder = 1;
+          }
+        } catch (err) {
+          console.warn("Could not query max display_order for officials, defaulting to 1:", err);
+          displayOrder = 1;
+        }
+      }
+    } else {
+      if (!displayOrder || displayOrder <= 0) {
+        displayOrder = 1;
+      }
+    }
+
+    displayOrder = Math.max(1, Math.floor(displayOrder));
+
     const payload: any = {
       name: item.name,
       role: item.role,
       level: Number(item.level) || 3,
-      display_order: Number(item.display_order) || 0,
+      display_order: displayOrder,
       image_url: item.image_url || null,
       biography: item.biography || null,
       contact_info: item.contact_info || null,
@@ -661,7 +692,7 @@ export const cmsService = {
     }
 
     const id = "mock-" + Math.random().toString(36).substring(2, 9);
-    const newItem = { ...item, department_id: deptId || undefined, id } as OfficialItem;
+    const newItem = { ...item, department_id: deptId || undefined, display_order: displayOrder, id } as OfficialItem;
     const list = getStorage<OfficialItem>("officials", INITIAL_OFFICIALS);
     list.push(newItem);
     setStorage("officials", list);
@@ -674,7 +705,10 @@ export const cmsService = {
     if (item.name !== undefined) payload.name = item.name;
     if (item.role !== undefined) payload.role = item.role;
     if (item.level !== undefined) payload.level = Number(item.level);
-    if (item.display_order !== undefined) payload.display_order = Number(item.display_order);
+    if (item.display_order !== undefined) {
+      const parsedOrder = Number(item.display_order);
+      payload.display_order = parsedOrder && parsedOrder >= 1 ? Math.floor(parsedOrder) : 1;
+    }
     if (item.image_url !== undefined) payload.image_url = item.image_url || null;
     if (item.biography !== undefined) payload.biography = item.biography || null;
     if (item.contact_info !== undefined) payload.contact_info = item.contact_info || null;

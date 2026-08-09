@@ -221,8 +221,8 @@ const AdminDashboard: React.FC = () => {
   });
 
   const [officialForm, setOfficialForm] = useState<Omit<OfficialItem, 'id'>>({
-    name: '', role: '', level: 3, display_order: 0, image_url: '', biography: '',
-    contact_info: '', department: ''
+    name: '', role: '', level: 3, display_order: 1, image_url: '', biography: '',
+    contact_info: '', department_id: '', department: ''
   });
 
   const [departmentForm, setDepartmentForm] = useState<Omit<DepartmentItem, 'id'>>({
@@ -237,13 +237,13 @@ const AdminDashboard: React.FC = () => {
 
   const [serviceForm, setServiceForm] = useState<Omit<ServiceCmsItem, 'id'>>({
     name: '', slug: '', description: '', purpose: '', requirements: [],
-    processing_time: '3 to 5 business days', fees: 'None', office_responsible: '',
+    processing_time: '3 to 5 business days', fees: 'None', office_responsible_id: '', office_responsible: '',
     office_hours: 'Monday to Friday, 8:00 AM - 5:00 PM', contact_info: '',
     physical_address: '', status: 'available', downloadable_forms: []
   });
 
   const [charterForm, setCharterForm] = useState<Omit<CitizensCharterCmsItem, 'id'>>({
-    office: '', service_name: '', requirements: [], processing_time: '',
+    office_id: '', office: '', service_name: '', requirements: [], processing_time: '',
     fees: 'No Fees', steps: [], downloadable_forms: []
   });
 
@@ -543,8 +543,8 @@ const AdminDashboard: React.FC = () => {
       opening_hours: 'Always Open', contact_details: '', featured_image: ''
     });
     setOfficialForm({
-      name: '', role: '', level: 3, display_order: 0, image_url: '', biography: '',
-      contact_info: '', department: ''
+      name: '', role: '', level: 3, display_order: 1, image_url: '', biography: '',
+      contact_info: '', department_id: '', department: ''
     });
     setDepartmentForm({
       name: '', description: '', head_of_office: '', contact_number: '', email: '',
@@ -556,12 +556,12 @@ const AdminDashboard: React.FC = () => {
     });
     setServiceForm({
       name: '', slug: '', description: '', purpose: '', requirements: [],
-      processing_time: '3 to 5 business days', fees: 'None', office_responsible: '',
+      processing_time: '3 to 5 business days', fees: 'None', office_responsible_id: '', office_responsible: '',
       office_hours: 'Monday to Friday, 8:00 AM - 5:00 PM', contact_info: '',
       physical_address: '', status: 'available', downloadable_forms: []
     });
     setCharterForm({
-      office: '', service_name: '', requirements: [], processing_time: '',
+      office_id: '', office: '', service_name: '', requirements: [], processing_time: '',
       fees: 'No Fees', steps: [], downloadable_forms: []
     });
     setEventForm({
@@ -605,9 +605,9 @@ const AdminDashboard: React.FC = () => {
       });
     } else if (tab === 'officials') {
       setOfficialForm({
-        name: item.name, role: item.role, level: item.level || 3, display_order: item.display_order || 0,
+        name: item.name, role: item.role, level: item.level || 3, display_order: item.display_order && item.display_order >= 1 ? item.display_order : 1,
         image_url: item.image_url || '', biography: item.biography || '',
-        contact_info: item.contact_info || '', department: item.department || ''
+        contact_info: item.contact_info || '', department_id: item.department_id || item.department || '', department: item.department_id || item.department || ''
       });
     } else if (tab === 'departments') {
       setDepartmentForm({
@@ -625,14 +625,14 @@ const AdminDashboard: React.FC = () => {
       setServiceForm({
         name: item.name, slug: item.slug, description: item.description, purpose: item.purpose || '',
         requirements: item.requirements || [], processing_time: item.processing_time || '3 to 5 business days',
-        fees: item.fees || 'None', office_responsible: item.office_responsible || '',
+        fees: item.fees || 'None', office_responsible_id: item.office_responsible_id || item.office_responsible || '', office_responsible: item.office_responsible_id || item.office_responsible || '',
         office_hours: item.office_hours || 'Monday to Friday, 8:00 AM - 5:00 PM',
         contact_info: item.contact_info || '', physical_address: item.physical_address || '',
         status: item.status || 'available', downloadable_forms: item.downloadable_forms || []
       });
     } else if (tab === 'charter') {
       setCharterForm({
-        office: item.office, service_name: item.service_name, requirements: item.requirements || [],
+        office_id: item.office_id || item.office || '', office: item.office_id || item.office || '', service_name: item.service_name, requirements: item.requirements || [],
         processing_time: item.processing_time || '', fees: item.fees || 'No Fees',
         steps: item.steps || [], downloadable_forms: item.downloadable_forms || []
       });
@@ -3290,8 +3290,8 @@ const AdminDashboard: React.FC = () => {
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest" htmlFor="off-dept">Department</label>
                         <select
                           id="off-dept"
-                          value={officialForm.department || ""}
-                          onChange={(e) => setOfficialForm({ ...officialForm, department: e.target.value })}
+                          value={officialForm.department_id || officialForm.department || ""}
+                          onChange={(e) => setOfficialForm({ ...officialForm, department_id: e.target.value, department: e.target.value })}
                           className="w-full bg-gray-50 border border-transparent rounded-2xl py-4 px-6 font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400/20 text-xs cursor-pointer"
                         >
                           <option value="">-- No Department --</option>
@@ -3311,7 +3311,7 @@ const AdminDashboard: React.FC = () => {
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest" htmlFor="off-order">Display Order (weight)</label>
-                        <input id="off-order" type="number" value={officialForm.display_order} onChange={(e) => setOfficialForm({ ...officialForm, display_order: parseInt(e.target.value) || 0 })} className="w-full bg-gray-50 border border-transparent rounded-2xl py-4 px-6 font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400/20 text-xs" />
+                        <input id="off-order" type="number" min="1" value={officialForm.display_order} onChange={(e) => setOfficialForm({ ...officialForm, display_order: Math.max(1, parseInt(e.target.value) || 1) })} className="w-full bg-gray-50 border border-transparent rounded-2xl py-4 px-6 font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400/20 text-xs" />
                       </div>
                     </div>
 
@@ -3480,8 +3480,8 @@ const AdminDashboard: React.FC = () => {
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest" htmlFor="srv-office">Office Responsible</label>
                             <select
                               id="srv-office"
-                              value={serviceForm.office_responsible}
-                              onChange={(e) => setServiceForm({ ...serviceForm, office_responsible: e.target.value })}
+                              value={serviceForm.office_responsible_id || serviceForm.office_responsible || ""}
+                              onChange={(e) => setServiceForm({ ...serviceForm, office_responsible_id: e.target.value, office_responsible: e.target.value })}
                               className="w-full bg-gray-50 border border-transparent rounded-2xl py-4 px-6 font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400/20 text-xs cursor-pointer"
                               required
                             >
@@ -3668,8 +3668,8 @@ const AdminDashboard: React.FC = () => {
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest" htmlFor="cc-office">Department / Office Name *</label>
                             <select
                               id="cc-office"
-                              value={charterForm.office}
-                              onChange={(e) => setCharterForm({ ...charterForm, office: e.target.value })}
+                              value={charterForm.office_id || charterForm.office || ""}
+                              onChange={(e) => setCharterForm({ ...charterForm, office_id: e.target.value, office: e.target.value })}
                               className="w-full bg-gray-50 border border-transparent rounded-2xl py-4 px-6 font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400/20 text-xs cursor-pointer"
                               required
                             >
