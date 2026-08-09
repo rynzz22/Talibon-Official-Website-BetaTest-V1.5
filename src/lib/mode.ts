@@ -15,6 +15,8 @@ export function isMockAllowed(): boolean {
   return import.meta.env?.VITE_ENABLE_MOCK_DATA !== "false";
 }
 
+//manual deployment test
+
 /**
  * Helper to assert production behavior or fail explicitly.
  * If we are in production and a database/storage dependency is unavailable,

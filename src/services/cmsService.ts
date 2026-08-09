@@ -5,7 +5,7 @@ import { tourismService } from "./tourismService";
 import { downloadablesService } from "./downloadablesService";
 import { servicesCmsService } from "./servicesCmsService";
 import { isMockAllowed } from "../lib/mode";
-
+//manual deployment test
 // Interfaces matching database columns
 export interface NewsItem {
   id: string;

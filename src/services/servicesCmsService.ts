@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { logCmsAction, ServiceCmsItem } from "./cmsService";
 import { isMockAllowed } from "../lib/mode";
 
+//manual deployment test
 const INITIAL_SERVICES: ServiceCmsItem[] = [
   {
     id: "apply-permit",
