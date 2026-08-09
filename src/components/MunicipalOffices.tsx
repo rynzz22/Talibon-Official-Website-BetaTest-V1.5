@@ -66,18 +66,10 @@ export default function MunicipalOffices() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="section-title uppercase"
+            className="section-title uppercase mb-6"
           >
             Municipal Offices & Departments
           </motion.h2>
-          
-          {/* Decorative Underline */}
-          <div className="flex justify-center gap-1 mb-6">
-            <div className="w-12 h-1 bg-emerald-500 rounded-full" />
-            <div className="w-12 h-1 bg-blue-500 rounded-full" />
-            <div className="w-12 h-1 bg-sky-500 rounded-full" />
-            <div className="w-12 h-1 bg-purple-500 rounded-full" />
-          </div>
 
           <motion.p 
             initial={{ opacity: 0 }}
