@@ -56,6 +56,7 @@ export interface OfficialItem {
   image_url?: string;
   biography?: string;
   contact_info?: string;
+  department_id?: string | null;
   department?: string;
   created_at?: string;
 }
@@ -63,6 +64,8 @@ export interface OfficialItem {
 export interface DepartmentItem {
   id: string;
   name: string;
+  slug?: string;
+  official_name?: string | null;
   description: string;
   head_of_office?: string;
   contact_number?: string;
@@ -75,12 +78,15 @@ export interface DepartmentItem {
 export interface BarangayItem {
   id: string;
   name: string;
+  slug?: string | null;
   captain: string | null;
   population: number;
   contact_number?: string | null;
   office_address?: string | null;
   office_hours?: string | null;
   cover_image?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -94,6 +100,7 @@ export interface ServiceCmsItem {
   requirements: string[];
   processing_time: string;
   fees: string;
+  office_responsible_id?: string | null;
   office_responsible: string;
   office_hours: string;
   contact_info?: string;
@@ -105,6 +112,7 @@ export interface ServiceCmsItem {
 
 export interface CitizensCharterCmsItem {
   id: string;
+  office_id?: string | null;
   office: string;
   service_name: string;
   requirements: string[];
@@ -432,6 +440,7 @@ const INITIAL_USERS: UserProfileItem[] = [
 
 // LocalStorage Helper functions
 function getStorage<T>(key: string, defaults: T[]): T[] {
+  if (typeof localStorage === 'undefined') return defaults;
   const data = localStorage.getItem(`cms_data:${key}`);
   if (!data) {
     localStorage.setItem(`cms_data:${key}`, JSON.stringify(defaults));
@@ -441,6 +450,7 @@ function getStorage<T>(key: string, defaults: T[]): T[] {
 }
 
 function setStorage<T>(key: string, data: T[]): void {
+  if (typeof localStorage === 'undefined') return;
   localStorage.setItem(`cms_data:${key}`, JSON.stringify(data));
 }
 
@@ -569,9 +579,27 @@ export const cmsService = {
   async getOfficials(): Promise<OfficialItem[]> {
     if (isSupabaseConfigured) {
       try {
-        const { data, error } = await supabase.from("officials").select("*").order("level", { ascending: true }).order("display_order", { ascending: true });
+        const { data, error } = await supabase
+          .from("officials")
+          .select("*, departments:department_id(id, name, official_name)")
+          .order("level", { ascending: true })
+          .order("display_order", { ascending: true });
         if (error) throw error;
-        if (data) return data as OfficialItem[];
+        if (data) {
+          return data.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            role: d.role,
+            level: d.level || 3,
+            display_order: d.display_order || 0,
+            image_url: d.image_url || "",
+            biography: d.biography || "",
+            contact_info: d.contact_info || "",
+            department_id: d.department_id || null,
+            department: d.departments?.name || d.department_id || "",
+            created_at: d.created_at
+          })) as OfficialItem[];
+        }
       } catch (e: any) {
         if (!isMockAllowed()) {
           throw new Error(`[CMSService] Failed to load officials: ${e.message}`);
@@ -586,17 +614,41 @@ export const cmsService = {
   },
 
   async createOfficial(item: Omit<OfficialItem, "id">, userEmail: string): Promise<OfficialItem> {
-    const sanitizedItem = {
-      ...item,
-      department: item.department && item.department.trim() !== "" ? item.department.trim() : null
+    const deptId = item.department_id || (item.department && item.department.trim() !== "" ? item.department.trim() : null);
+    const payload: any = {
+      name: item.name,
+      role: item.role,
+      level: Number(item.level) || 3,
+      display_order: Number(item.display_order) || 0,
+      image_url: item.image_url || null,
+      biography: item.biography || null,
+      contact_info: item.contact_info || null,
+      department_id: deptId || null
     };
+
     if (isSupabaseConfigured) {
       try {
-        const { data, error } = await supabase.from("officials").insert([sanitizedItem]).select().maybeSingle();
+        const { data, error } = await supabase
+          .from("officials")
+          .insert([payload])
+          .select("*, departments:department_id(id, name)")
+          .maybeSingle();
         if (error) throw error;
         if (data) {
           await logCmsAction(userEmail, "CREATE", "officials", data.id);
-          return data as OfficialItem;
+          return {
+            id: data.id,
+            name: data.name,
+            role: data.role,
+            level: data.level,
+            display_order: data.display_order,
+            image_url: data.image_url || "",
+            biography: data.biography || "",
+            contact_info: data.contact_info || "",
+            department_id: data.department_id || null,
+            department: data.departments?.name || data.department_id || "",
+            created_at: data.created_at
+          } as OfficialItem;
         }
       } catch (e: any) {
         console.error("Supabase Officials insert failed:", e.message || e);
@@ -609,7 +661,7 @@ export const cmsService = {
     }
 
     const id = "mock-" + Math.random().toString(36).substring(2, 9);
-    const newItem = { ...sanitizedItem, id } as OfficialItem;
+    const newItem = { ...item, department_id: deptId || undefined, id } as OfficialItem;
     const list = getStorage<OfficialItem>("officials", INITIAL_OFFICIALS);
     list.push(newItem);
     setStorage("officials", list);
@@ -618,21 +670,43 @@ export const cmsService = {
   },
 
   async updateOfficial(id: string, item: Partial<OfficialItem>, userEmail: string): Promise<OfficialItem> {
-    const sanitizedItem = {
-      ...item,
-      department: item.department !== undefined ? (item.department && item.department.trim() !== "" ? item.department.trim() : null) : undefined
-    };
-    // remove undefined values so they are not sent to database
-    const cleanPayload = Object.fromEntries(
-      Object.entries(sanitizedItem).filter(([_, v]) => v !== undefined)
-    );
+    const payload: any = {};
+    if (item.name !== undefined) payload.name = item.name;
+    if (item.role !== undefined) payload.role = item.role;
+    if (item.level !== undefined) payload.level = Number(item.level);
+    if (item.display_order !== undefined) payload.display_order = Number(item.display_order);
+    if (item.image_url !== undefined) payload.image_url = item.image_url || null;
+    if (item.biography !== undefined) payload.biography = item.biography || null;
+    if (item.contact_info !== undefined) payload.contact_info = item.contact_info || null;
+    if (item.department_id !== undefined || item.department !== undefined) {
+      const deptId = item.department_id !== undefined ? item.department_id : item.department;
+      payload.department_id = deptId && deptId.trim() !== "" ? deptId.trim() : null;
+    }
+
     if (isSupabaseConfigured) {
       try {
-        const { data, error } = await supabase.from("officials").update(cleanPayload).eq("id", id).select().maybeSingle();
+        const { data, error } = await supabase
+          .from("officials")
+          .update(payload)
+          .eq("id", id)
+          .select("*, departments:department_id(id, name)")
+          .maybeSingle();
         if (error) throw error;
         if (data) {
           await logCmsAction(userEmail, "UPDATE", "officials", id);
-          return data as OfficialItem;
+          return {
+            id: data.id,
+            name: data.name,
+            role: data.role,
+            level: data.level,
+            display_order: data.display_order,
+            image_url: data.image_url || "",
+            biography: data.biography || "",
+            contact_info: data.contact_info || "",
+            department_id: data.department_id || null,
+            department: data.departments?.name || data.department_id || "",
+            created_at: data.created_at
+          } as OfficialItem;
         }
       } catch (e: any) {
         console.error("Supabase Officials update failed:", e.message || e);
@@ -647,7 +721,7 @@ export const cmsService = {
     const list = getStorage<OfficialItem>("officials", INITIAL_OFFICIALS);
     const index = list.findIndex(n => n.id === id);
     if (index !== -1) {
-      list[index] = { ...list[index], ...sanitizedItem };
+      list[index] = { ...list[index], ...item };
       setStorage("officials", list);
       await logCmsAction(userEmail, "UPDATE", "officials", id);
       return list[index];
@@ -700,9 +774,22 @@ export const cmsService = {
   },
 
   async createDepartment(item: Omit<DepartmentItem, "id">, userEmail: string): Promise<DepartmentItem> {
+    const slug = item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const payload = {
+      name: item.name,
+      slug,
+      official_name: item.official_name || null,
+      description: item.description,
+      head_of_office: item.head_of_office || null,
+      contact_number: item.contact_number || null,
+      email: item.email || null,
+      office_hours: item.office_hours || "Monday to Friday, 8:00 AM - 5:00 PM",
+      location: item.location || null
+    };
+
     if (isSupabaseConfigured) {
       try {
-        const { data, error } = await supabase.from("departments").insert([item]).select().maybeSingle();
+        const { data, error } = await supabase.from("departments").insert([payload]).select().maybeSingle();
         if (error) throw error;
         if (data) {
           await logCmsAction(userEmail, "CREATE", "departments", data.id);
@@ -728,9 +815,23 @@ export const cmsService = {
   },
 
   async updateDepartment(id: string, item: Partial<DepartmentItem>, userEmail: string): Promise<DepartmentItem> {
+    const payload: any = {};
+    if (item.name !== undefined) {
+      payload.name = item.name;
+      if (!item.slug) payload.slug = item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    }
+    if (item.slug !== undefined) payload.slug = item.slug;
+    if (item.official_name !== undefined) payload.official_name = item.official_name || null;
+    if (item.description !== undefined) payload.description = item.description;
+    if (item.head_of_office !== undefined) payload.head_of_office = item.head_of_office || null;
+    if (item.contact_number !== undefined) payload.contact_number = item.contact_number || null;
+    if (item.email !== undefined) payload.email = item.email || null;
+    if (item.office_hours !== undefined) payload.office_hours = item.office_hours;
+    if (item.location !== undefined) payload.location = item.location || null;
+
     if (isSupabaseConfigured) {
       try {
-        const { data, error } = await supabase.from("departments").update(item).eq("id", id).select().maybeSingle();
+        const { data, error } = await supabase.from("departments").update(payload).eq("id", id).select().maybeSingle();
         if (error) throw error;
         if (data) {
           await logCmsAction(userEmail, "UPDATE", "departments", id);
@@ -794,12 +895,15 @@ export const cmsService = {
             return {
               id: d.id,
               name: d.name,
+              slug: d.slug || d.name.toLowerCase().replace(/\s+/g, "_"),
               captain: d.captain,
               population: d.population || 0,
-              contact_number: fallback?.contact_number || "",
-              office_address: fallback?.office_address || "",
-              office_hours: fallback?.office_hours || "Monday to Friday, 8:00 AM - 5:00 PM",
-              cover_image: fallback?.cover_image || ""
+              contact_number: d.contact_number || fallback?.contact_number || "",
+              office_address: d.office_address || fallback?.office_address || "",
+              office_hours: d.office_hours || fallback?.office_hours || "Monday to Friday, 8:00 AM - 5:00 PM",
+              cover_image: d.cover_image || fallback?.cover_image || "",
+              latitude: d.latitude || null,
+              longitude: d.longitude || null
             };
           });
         }
@@ -817,25 +921,38 @@ export const cmsService = {
   },
 
   async createBarangay(item: Omit<BarangayItem, "id">, userEmail: string): Promise<BarangayItem> {
-    const id = item.name.toLowerCase().replace(/\s+/g, "_");
+    const slug = item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const payload = {
+      name: item.name,
+      slug,
+      captain: item.captain || null,
+      population: Number(item.population) || 0,
+      contact_number: item.contact_number || null,
+      office_address: item.office_address || null,
+      office_hours: item.office_hours || "Monday to Friday, 8:00 AM - 5:00 PM",
+      cover_image: item.cover_image || null,
+      latitude: item.latitude || null,
+      longitude: item.longitude || null
+    };
+
     if (isSupabaseConfigured) {
       try {
-        const payload = {
-          id,
-          name: item.name,
-          captain: item.captain,
-          population: item.population
-        };
         const { data, error } = await supabase.from("barangays").insert([payload]).select().maybeSingle();
         if (error) throw error;
         if (data) {
-          await logCmsAction(userEmail, "CREATE", "barangays", id);
+          await logCmsAction(userEmail, "CREATE", "barangays", data.id);
           return {
-            ...item,
             id: data.id,
             name: data.name,
+            slug: data.slug || slug,
             captain: data.captain,
-            population: data.population
+            population: data.population,
+            contact_number: data.contact_number || "",
+            office_address: data.office_address || "",
+            office_hours: data.office_hours || "",
+            cover_image: data.cover_image || "",
+            latitude: data.latitude || null,
+            longitude: data.longitude || null
           };
         }
       } catch (e: any) {
@@ -848,38 +965,46 @@ export const cmsService = {
       throw new Error("[CMSService] Supabase is unconfigured. Production Mode requires a live database connection to save barangays.");
     }
 
-    const newItem = { ...item, id } as BarangayItem;
+    const mockId = "mock-" + Math.random().toString(36).substring(2, 9);
+    const newItem = { ...item, id: mockId } as BarangayItem;
     const list = getStorage<BarangayItem>("barangays", INITIAL_BARANGAYS);
     list.push(newItem);
     setStorage("barangays", list);
-    await logCmsAction(userEmail, "CREATE", "barangays", id);
+    await logCmsAction(userEmail, "CREATE", "barangays", mockId);
     return newItem;
   },
 
   async updateBarangay(id: string, item: Partial<BarangayItem>, userEmail: string): Promise<BarangayItem> {
+    const payload: any = {};
+    if (item.name !== undefined) payload.name = item.name;
+    if (item.slug !== undefined) payload.slug = item.slug;
+    if (item.captain !== undefined) payload.captain = item.captain;
+    if (item.population !== undefined) payload.population = Number(item.population);
+    if (item.contact_number !== undefined) payload.contact_number = item.contact_number || null;
+    if (item.office_address !== undefined) payload.office_address = item.office_address || null;
+    if (item.office_hours !== undefined) payload.office_hours = item.office_hours || null;
+    if (item.cover_image !== undefined) payload.cover_image = item.cover_image || null;
+    if (item.latitude !== undefined) payload.latitude = item.latitude || null;
+    if (item.longitude !== undefined) payload.longitude = item.longitude || null;
+
     if (isSupabaseConfigured) {
       try {
-        const payload: any = {};
-        if (item.name !== undefined) payload.name = item.name;
-        if (item.captain !== undefined) payload.captain = item.captain;
-        if (item.population !== undefined) payload.population = item.population;
-
         const { data, error } = await supabase.from("barangays").update(payload).eq("id", id).select().maybeSingle();
         if (error) throw error;
         if (data) {
           await logCmsAction(userEmail, "UPDATE", "barangays", id);
-          const list = getStorage<BarangayItem>("barangays", INITIAL_BARANGAYS);
-          const index = list.findIndex(n => n.id === id);
-          if (index !== -1) {
-            list[index] = { ...list[index], ...item, name: data.name, captain: data.captain, population: data.population };
-            setStorage("barangays", list);
-          }
           return {
-            ...item,
             id: data.id,
             name: data.name,
+            slug: data.slug,
             captain: data.captain,
-            population: data.population
+            population: data.population,
+            contact_number: data.contact_number || "",
+            office_address: data.office_address || "",
+            office_hours: data.office_hours || "",
+            cover_image: data.cover_image || "",
+            latitude: data.latitude || null,
+            longitude: data.longitude || null
           } as BarangayItem;
         }
       } catch (e: any) {
@@ -944,13 +1069,29 @@ export const cmsService = {
     return servicesCmsService.deleteService(id, userEmail);
   },
 
-  // Citizens Charter CRUD
+  // Citizens Charter CRUD (Uses 'citizen_charters' table in V4 schema)
   async getCitizensCharter(): Promise<CitizensCharterCmsItem[]> {
     if (isSupabaseConfigured) {
       try {
-        const { data, error } = await supabase.from("citizens_charter_cms").select("*");
+        const { data, error } = await supabase
+          .from("citizen_charters")
+          .select("*, departments:office_id(id, name)")
+          .order("service_name", { ascending: true });
         if (error) throw error;
-        if (data) return data as CitizensCharterCmsItem[];
+        if (data) {
+          return data.map((d: any) => ({
+            id: d.id,
+            office_id: d.office_id || null,
+            office: d.departments?.name || d.office || "Municipal Office",
+            service_name: d.service_name,
+            requirements: Array.isArray(d.requirements) ? d.requirements : [],
+            processing_time: d.processing_time || "1 business day",
+            fees: d.fees || "No Fees",
+            steps: Array.isArray(d.steps) ? d.steps : [],
+            downloadable_forms: Array.isArray(d.downloadable_forms) ? d.downloadable_forms : [],
+            created_at: d.created_at
+          })) as CitizensCharterCmsItem[];
+        }
       } catch (e: any) {
         if (!isMockAllowed()) {
           throw new Error(`[CMSService] Failed to load citizens charter: ${e.message}`);
@@ -965,13 +1106,40 @@ export const cmsService = {
   },
 
   async createCitizensCharter(item: Omit<CitizensCharterCmsItem, "id">, userEmail: string): Promise<CitizensCharterCmsItem> {
+    const officeId = item.office_id || (item.office && item.office.trim() !== "" ? item.office.trim() : null);
+    const payload: any = {
+      office_id: officeId,
+      office: item.office || "Municipal Office",
+      service_name: item.service_name,
+      requirements: item.requirements || [],
+      processing_time: item.processing_time || null,
+      fees: item.fees || "No Fees",
+      steps: item.steps || [],
+      downloadable_forms: item.downloadable_forms || []
+    };
+
     if (isSupabaseConfigured) {
       try {
-        const { data, error } = await supabase.from("citizens_charter_cms").insert([item]).select().maybeSingle();
+        const { data, error } = await supabase
+          .from("citizen_charters")
+          .insert([payload])
+          .select("*, departments:office_id(id, name)")
+          .maybeSingle();
         if (error) throw error;
         if (data) {
-          await logCmsAction(userEmail, "CREATE", "citizens_charter_cms", data.id);
-          return data as CitizensCharterCmsItem;
+          await logCmsAction(userEmail, "CREATE", "citizen_charters", data.id);
+          return {
+            id: data.id,
+            office_id: data.office_id || null,
+            office: data.departments?.name || data.office || "Municipal Office",
+            service_name: data.service_name,
+            requirements: Array.isArray(data.requirements) ? data.requirements : [],
+            processing_time: data.processing_time || "",
+            fees: data.fees || "",
+            steps: Array.isArray(data.steps) ? data.steps : [],
+            downloadable_forms: Array.isArray(data.downloadable_forms) ? data.downloadable_forms : [],
+            created_at: data.created_at
+          } as CitizensCharterCmsItem;
         }
       } catch (e: any) {
         console.error("Supabase Citizen Charter insert failed:", e.message || e);
@@ -988,18 +1156,46 @@ export const cmsService = {
     const list = getStorage<CitizensCharterCmsItem>("citizens_charter_cms", INITIAL_CHARTERS);
     list.push(newItem);
     setStorage("citizens_charter_cms", list);
-    await logCmsAction(userEmail, "CREATE", "citizens_charter_cms", id);
+    await logCmsAction(userEmail, "CREATE", "citizen_charters", id);
     return newItem;
   },
 
   async updateCitizensCharter(id: string, item: Partial<CitizensCharterCmsItem>, userEmail: string): Promise<CitizensCharterCmsItem> {
+    const payload: any = {};
+    if (item.service_name !== undefined) payload.service_name = item.service_name;
+    if (item.office !== undefined || item.office_id !== undefined) {
+      payload.office_id = item.office_id || item.office || null;
+      if (item.office) payload.office = item.office;
+    }
+    if (item.requirements !== undefined) payload.requirements = item.requirements;
+    if (item.processing_time !== undefined) payload.processing_time = item.processing_time;
+    if (item.fees !== undefined) payload.fees = item.fees;
+    if (item.steps !== undefined) payload.steps = item.steps;
+    if (item.downloadable_forms !== undefined) payload.downloadable_forms = item.downloadable_forms;
+
     if (isSupabaseConfigured) {
       try {
-        const { data, error } = await supabase.from("citizens_charter_cms").update(item).eq("id", id).select().maybeSingle();
+        const { data, error } = await supabase
+          .from("citizen_charters")
+          .update(payload)
+          .eq("id", id)
+          .select("*, departments:office_id(id, name)")
+          .maybeSingle();
         if (error) throw error;
         if (data) {
-          await logCmsAction(userEmail, "UPDATE", "citizens_charter_cms", id);
-          return data as CitizensCharterCmsItem;
+          await logCmsAction(userEmail, "UPDATE", "citizen_charters", id);
+          return {
+            id: data.id,
+            office_id: data.office_id || null,
+            office: data.departments?.name || data.office || "Municipal Office",
+            service_name: data.service_name,
+            requirements: Array.isArray(data.requirements) ? data.requirements : [],
+            processing_time: data.processing_time || "",
+            fees: data.fees || "",
+            steps: Array.isArray(data.steps) ? data.steps : [],
+            downloadable_forms: Array.isArray(data.downloadable_forms) ? data.downloadable_forms : [],
+            created_at: data.created_at
+          } as CitizensCharterCmsItem;
         }
       } catch (e: any) {
         console.error("Supabase Citizen Charter update failed:", e.message || e);
@@ -1016,7 +1212,7 @@ export const cmsService = {
     if (index !== -1) {
       list[index] = { ...list[index], ...item };
       setStorage("citizens_charter_cms", list);
-      await logCmsAction(userEmail, "UPDATE", "citizens_charter_cms", id);
+      await logCmsAction(userEmail, "UPDATE", "citizen_charters", id);
       return list[index];
     }
     throw new Error("Item not found");
@@ -1025,9 +1221,9 @@ export const cmsService = {
   async deleteCitizensCharter(id: string, userEmail: string): Promise<boolean> {
     if (isSupabaseConfigured) {
       try {
-        const { error } = await supabase.from("citizens_charter_cms").delete().eq("id", id);
+        const { error } = await supabase.from("citizen_charters").delete().eq("id", id);
         if (error) throw error;
-        await logCmsAction(userEmail, "DELETE", "citizens_charter_cms", id);
+        await logCmsAction(userEmail, "DELETE", "citizen_charters", id);
         return true;
       } catch (e: any) {
         console.error("Supabase Citizen Charter delete failed:", e.message || e);
@@ -1042,7 +1238,7 @@ export const cmsService = {
     const list = getStorage<CitizensCharterCmsItem>("citizens_charter_cms", INITIAL_CHARTERS);
     const filtered = list.filter(n => n.id !== id);
     setStorage("citizens_charter_cms", filtered);
-    await logCmsAction(userEmail, "DELETE", "citizens_charter_cms", id);
+    await logCmsAction(userEmail, "DELETE", "citizen_charters", id);
     return true;
   },
 

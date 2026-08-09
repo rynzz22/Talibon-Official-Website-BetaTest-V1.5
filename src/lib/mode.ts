@@ -12,7 +12,7 @@
  */
 export function isMockAllowed(): boolean {
   // Allow offline and mock fallbacks whenever VITE_ENABLE_MOCK_DATA is not explicitly disabled
-  return import.meta.env.VITE_ENABLE_MOCK_DATA !== "false";
+  return import.meta.env?.VITE_ENABLE_MOCK_DATA !== "false";
 }
 
 /**

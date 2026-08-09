@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Retrieve environment variables safely
-const rawUrl = import.meta.env?.VITE_SUPABASE_URL;
-const rawKey = import.meta.env?.VITE_SUPABASE_ANON_KEY;
+const rawUrl = (import.meta as any)?.env?.VITE_SUPABASE_URL || (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_URL || process.env?.SUPABASE_URL : undefined);
+const rawKey = (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY || (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_ANON_KEY || process.env?.SUPABASE_SERVICE_ROLE_KEY : undefined);
 
 // Extract project ID from URL if possible
 const extractProjectId = (url: string | undefined): string => {
@@ -96,7 +96,7 @@ export function logSupabaseDiagnostics(context: string, errorDetail?: any): void
   
   // Attempt to check session
   try {
-    const sessionStr = localStorage.getItem("sb-vifrifxpugdqbwccoyxe-auth-token") || localStorage.getItem(`sb-${currentProjectId}-auth-token`);
+    const sessionStr = typeof localStorage !== 'undefined' ? (localStorage.getItem("sb-vifrifxpugdqbwccoyxe-auth-token") || localStorage.getItem(`sb-${currentProjectId}-auth-token`)) : null;
     console.log("Auth Session Exists :", !!sessionStr);
   } catch (err) {
     console.log("Auth Session Error  :", err);

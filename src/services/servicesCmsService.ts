@@ -54,6 +54,7 @@ const INITIAL_SERVICES: ServiceCmsItem[] = [
 ];
 
 function getStorageServices(): ServiceCmsItem[] {
+  if (typeof localStorage === 'undefined') return INITIAL_SERVICES;
   const data = localStorage.getItem("cms_data:services_cms");
   if (!data) {
     localStorage.setItem("cms_data:services_cms", JSON.stringify(INITIAL_SERVICES));
@@ -63,6 +64,7 @@ function getStorageServices(): ServiceCmsItem[] {
 }
 
 function setStorageServices(data: ServiceCmsItem[]): void {
+  if (typeof localStorage === 'undefined') return;
   localStorage.setItem("cms_data:services_cms", JSON.stringify(data));
 }
 
@@ -71,11 +73,30 @@ export const servicesCmsService = {
     if (isSupabaseConfigured) {
       try {
         const { data, error } = await supabase
-          .from("services_cms")
-          .select("*")
+          .from("municipal_services")
+          .select("*, departments:office_responsible_id(id, name)")
           .order("name", { ascending: true });
         if (error) throw error;
-        if (data) return data as ServiceCmsItem[];
+        if (data) {
+          return data.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            slug: d.slug,
+            description: d.description,
+            purpose: d.purpose || "",
+            requirements: Array.isArray(d.requirements) ? d.requirements : [],
+            processing_time: d.processing_time || "3 to 5 business days",
+            fees: d.fees || "None",
+            office_responsible_id: d.office_responsible_id || null,
+            office_responsible: d.departments?.name || d.office_responsible || "Municipal Office",
+            office_hours: d.office_hours || "Monday to Friday, 8:00 AM - 5:00 PM",
+            contact_info: d.contact_info || "",
+            physical_address: d.physical_address || "",
+            status: d.status || "available",
+            downloadable_forms: Array.isArray(d.downloadable_forms) ? d.downloadable_forms : [],
+            created_at: d.created_at
+          })) as ServiceCmsItem[];
+        }
       } catch (e: any) {
         if (!isMockAllowed()) {
           throw new Error(`[ServicesCmsService] Failed to load services: ${e.message}`);
@@ -91,17 +112,52 @@ export const servicesCmsService = {
   },
 
   async createService(item: Omit<ServiceCmsItem, "id">, userEmail: string): Promise<ServiceCmsItem> {
+    const officeRespId = item.office_responsible_id || (item.office_responsible && item.office_responsible.trim() !== "" ? item.office_responsible.trim() : null);
+    const payload = {
+      name: item.name,
+      slug: item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+      description: item.description,
+      purpose: item.purpose || null,
+      requirements: item.requirements || [],
+      processing_time: item.processing_time || null,
+      fees: item.fees || null,
+      office_responsible_id: officeRespId,
+      office_responsible: item.office_responsible || "Municipal Office",
+      office_hours: item.office_hours || "Monday to Friday, 8:00 AM - 5:00 PM",
+      contact_info: item.contact_info || null,
+      physical_address: item.physical_address || null,
+      status: item.status || "available",
+      downloadable_forms: item.downloadable_forms || []
+    };
+
     if (isSupabaseConfigured) {
       try {
         const { data, error } = await supabase
-          .from("services_cms")
-          .insert([item])
-          .select()
+          .from("municipal_services")
+          .insert([payload])
+          .select("*, departments:office_responsible_id(id, name)")
           .maybeSingle();
         if (error) throw error;
         if (data) {
-          await logCmsAction(userEmail, "CREATE", "services_cms", data.id);
-          return data as ServiceCmsItem;
+          await logCmsAction(userEmail, "CREATE", "municipal_services", data.id);
+          return {
+            id: data.id,
+            name: data.name,
+            slug: data.slug,
+            description: data.description,
+            purpose: data.purpose || "",
+            requirements: Array.isArray(data.requirements) ? data.requirements : [],
+            processing_time: data.processing_time || "",
+            fees: data.fees || "",
+            office_responsible_id: data.office_responsible_id || null,
+            office_responsible: data.departments?.name || data.office_responsible || "Municipal Office",
+            office_hours: data.office_hours || "",
+            contact_info: data.contact_info || "",
+            physical_address: data.physical_address || "",
+            status: data.status || "available",
+            downloadable_forms: Array.isArray(data.downloadable_forms) ? data.downloadable_forms : [],
+            created_at: data.created_at
+          } as ServiceCmsItem;
         }
       } catch (e: any) {
         console.error("[ServicesCmsService] Supabase Services insert failed:", e.message || e);
@@ -118,23 +174,58 @@ export const servicesCmsService = {
     const list = getStorageServices();
     list.push(newItem);
     setStorageServices(list);
-    await logCmsAction(userEmail, "CREATE", "services_cms", id);
+    await logCmsAction(userEmail, "CREATE", "municipal_services", id);
     return newItem;
   },
 
   async updateService(id: string, item: Partial<ServiceCmsItem>, userEmail: string): Promise<ServiceCmsItem> {
+    const payload: any = {};
+    if (item.name !== undefined) payload.name = item.name;
+    if (item.slug !== undefined) payload.slug = item.slug;
+    if (item.description !== undefined) payload.description = item.description;
+    if (item.purpose !== undefined) payload.purpose = item.purpose || null;
+    if (item.requirements !== undefined) payload.requirements = item.requirements;
+    if (item.processing_time !== undefined) payload.processing_time = item.processing_time || null;
+    if (item.fees !== undefined) payload.fees = item.fees || null;
+    if (item.office_responsible !== undefined || item.office_responsible_id !== undefined) {
+      payload.office_responsible_id = item.office_responsible_id || item.office_responsible || null;
+      if (item.office_responsible) payload.office_responsible = item.office_responsible;
+    }
+    if (item.office_hours !== undefined) payload.office_hours = item.office_hours || null;
+    if (item.contact_info !== undefined) payload.contact_info = item.contact_info || null;
+    if (item.physical_address !== undefined) payload.physical_address = item.physical_address || null;
+    if (item.status !== undefined) payload.status = item.status;
+    if (item.downloadable_forms !== undefined) payload.downloadable_forms = item.downloadable_forms;
+
     if (isSupabaseConfigured) {
       try {
         const { data, error } = await supabase
-          .from("services_cms")
-          .update(item)
+          .from("municipal_services")
+          .update(payload)
           .eq("id", id)
-          .select()
+          .select("*, departments:office_responsible_id(id, name)")
           .maybeSingle();
         if (error) throw error;
         if (data) {
-          await logCmsAction(userEmail, "UPDATE", "services_cms", id);
-          return data as ServiceCmsItem;
+          await logCmsAction(userEmail, "UPDATE", "municipal_services", id);
+          return {
+            id: data.id,
+            name: data.name,
+            slug: data.slug,
+            description: data.description,
+            purpose: data.purpose || "",
+            requirements: Array.isArray(data.requirements) ? data.requirements : [],
+            processing_time: data.processing_time || "",
+            fees: data.fees || "",
+            office_responsible_id: data.office_responsible_id || null,
+            office_responsible: data.departments?.name || data.office_responsible || "Municipal Office",
+            office_hours: data.office_hours || "",
+            contact_info: data.contact_info || "",
+            physical_address: data.physical_address || "",
+            status: data.status || "available",
+            downloadable_forms: Array.isArray(data.downloadable_forms) ? data.downloadable_forms : [],
+            created_at: data.created_at
+          } as ServiceCmsItem;
         }
       } catch (e: any) {
         console.error("[ServicesCmsService] Supabase Services update failed:", e.message || e);
@@ -151,7 +242,7 @@ export const servicesCmsService = {
     if (index !== -1) {
       list[index] = { ...list[index], ...item };
       setStorageServices(list);
-      await logCmsAction(userEmail, "UPDATE", "services_cms", id);
+      await logCmsAction(userEmail, "UPDATE", "municipal_services", id);
       return list[index];
     }
     throw new Error("Service item not found");
@@ -161,11 +252,11 @@ export const servicesCmsService = {
     if (isSupabaseConfigured) {
       try {
         const { error } = await supabase
-          .from("services_cms")
+          .from("municipal_services")
           .delete()
           .eq("id", id);
         if (error) throw error;
-        await logCmsAction(userEmail, "DELETE", "services_cms", id);
+        await logCmsAction(userEmail, "DELETE", "municipal_services", id);
         return true;
       } catch (e: any) {
         console.error("[ServicesCmsService] Supabase Services delete failed:", e.message || e);
@@ -180,7 +271,7 @@ export const servicesCmsService = {
     const list = getStorageServices();
     const filtered = list.filter(n => n.id !== id);
     setStorageServices(filtered);
-    await logCmsAction(userEmail, "DELETE", "services_cms", id);
+    await logCmsAction(userEmail, "DELETE", "municipal_services", id);
     return true;
   }
 };
