@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { 
@@ -10,11 +10,13 @@ import {
   Search,
   BookOpen,
   MapPin,
-  Compass
+  Compass,
+  Loader2
 } from "lucide-react";
 
 // Data
 import { SERVICES_DATA, ServiceInfo } from "../data/servicesData";
+import { supabase } from "../lib/supabase";
 
 // Shared Reusable Components
 import { ServiceStatusBadge } from "../components/ServiceStatusBadge";
@@ -28,15 +30,75 @@ const ServiceInfoPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
 
-  const service: ServiceInfo | undefined = slug ? SERVICES_DATA[slug] : undefined;
+  const [service, setService] = useState<ServiceInfo | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadService() {
+      setLoading(true);
+      if (!slug) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("municipal_services")
+          .select("*, departments:office_responsible_id(id, name)")
+          .is("deleted_at", null)
+          .or(`slug.eq.${slug},id.eq.${slug}`);
+
+        if (!error && data && data.length > 0) {
+          const item = data[0];
+          const mapped: ServiceInfo = {
+            id: item.slug || item.id,
+            title: item.name,
+            description: item.description || "",
+            purpose: item.purpose || "Official municipal government service for the Municipality of Talibon.",
+            requirements: Array.isArray(item.requirements) ? item.requirements : [],
+            processingTime: item.processing_time || "3 to 5 business days",
+            officeResponsible: item.departments?.name || item.office_responsible || "Municipal Office",
+            officeHours: item.office_hours || "Monday to Friday, 8:00 AM - 5:00 PM (except holidays)",
+            contactInfo: item.contact_info || "Phone: (038) 422-2895 | Email: info@talibon.gov.ph",
+            physicalAddress: item.physical_address || "Talibon Municipal Hall, Bohol, Philippines",
+            status: (item.status as any) || "available",
+            downloadableForms: Array.isArray(item.downloadable_forms) ? item.downloadable_forms : []
+          };
+          if (isMounted) {
+            setService(mapped);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("[ServiceInfoPage] Error loading service from Supabase:", err);
+      }
+
+      if (SERVICES_DATA[slug]) {
+        if (isMounted) {
+          setService(SERVICES_DATA[slug]);
+          setLoading(false);
+        }
+      } else {
+        if (isMounted) {
+          setService(null);
+          setLoading(false);
+        }
+      }
+    }
+
+    loadService();
+    return () => {
+      isMounted = false;
+    };
+  }, [slug]);
 
   // Dynamic SEO Metadata Integration
   useEffect(() => {
     if (service) {
-      // Document Title
       document.title = `${service.title} | Municipality of Talibon`;
 
-      // Meta Description
       let metaDesc = document.querySelector('meta[name="description"]');
       if (!metaDesc) {
         metaDesc = document.createElement('meta');
@@ -45,7 +107,6 @@ const ServiceInfoPage: React.FC = () => {
       }
       metaDesc.setAttribute('content', `${service.description} Learn the purpose, requirements, processing times, and responsible offices for ${service.title} in Talibon, Bohol.`);
 
-      // Open Graph Title
       let ogTitle = document.querySelector('meta[property="og:title"]');
       if (!ogTitle) {
         ogTitle = document.createElement('meta');
@@ -54,7 +115,6 @@ const ServiceInfoPage: React.FC = () => {
       }
       ogTitle.setAttribute('content', `${service.title} - Official E-Services Guide | Talibon`);
 
-      // Open Graph Description
       let ogDesc = document.querySelector('meta[property="og:description"]');
       if (!ogDesc) {
         ogDesc = document.createElement('meta');
@@ -62,15 +122,25 @@ const ServiceInfoPage: React.FC = () => {
         document.head.appendChild(ogDesc);
       }
       ogDesc.setAttribute('content', service.description);
-    } else {
+    } else if (!loading) {
       document.title = "Service Not Found | Municipality of Talibon";
     }
 
-    // Cleanup or reset on unmount (optional, but keep simple)
     return () => {
       document.title = "Municipality of Talibon | Official Website";
     };
-  }, [service]);
+  }, [service, loading]);
+
+  if (loading) {
+    return (
+      <div className="py-24 px-4 max-w-5xl mx-auto text-center flex flex-col items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-10 h-10 text-brand-primary animate-spin mb-4" />
+        <p className="text-sm font-bold text-brand-muted uppercase tracking-widest">
+          Loading Municipal Service Information...
+        </p>
+      </div>
+    );
+  }
 
   // Handle Invalid Route / Service Not Found
   if (!service) {

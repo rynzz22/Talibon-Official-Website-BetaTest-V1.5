@@ -158,7 +158,40 @@ The municipality possesses a total land area of 140.46 sq km, of which about 7.9
   getVicinityMap: () => api.get("content", API_ENDPOINTS.ABOUT.VICINITY_MAP),
   getBarangays: () => api.get("content", API_ENDPOINTS.ABOUT.BARANGAYS),
   getIndustry: () => api.get("content", API_ENDPOINTS.ABOUT.INDUSTRY),
-  getServices: () => api.get("content", API_ENDPOINTS.ABOUT.SERVICES),
+  getServices: async () => {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from("municipal_services")
+          .select("*, departments:office_responsible_id(id, name)")
+          .is("deleted_at", null)
+          .order("name", { ascending: true });
+
+        if (!error && data) {
+          return data.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            slug: s.slug || s.id,
+            description: s.description || "",
+            purpose: s.purpose || "",
+            requirements: Array.isArray(s.requirements) ? s.requirements : [],
+            processing_time: s.processing_time || "",
+            fees: s.fees || "",
+            office_responsible_id: s.office_responsible_id || null,
+            office_responsible: s.departments?.name || s.office_responsible || "Municipal Office",
+            office_hours: s.office_hours || "Monday to Friday, 8:00 AM - 5:00 PM",
+            contact_info: s.contact_info || "",
+            physical_address: s.physical_address || "",
+            status: s.status || "available",
+            downloadable_forms: Array.isArray(s.downloadable_forms) ? s.downloadable_forms : []
+          }));
+        }
+      } catch (e) {
+        console.warn("[aboutApi] getServices Supabase query failed:", e);
+      }
+    }
+    return [];
+  },
   getHymn: () => api.get("content", API_ENDPOINTS.ABOUT.HYMN),
   getDemographics: () => api.get("content", API_ENDPOINTS.ABOUT.DEMOGRAPHICS),
   getLocation: () => api.get("content", API_ENDPOINTS.ABOUT.LOCATION),

@@ -1,4 +1,22 @@
 import { Injectable } from "@nestjs/common";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+
+function getSupabaseClient(): SupabaseClient | null {
+  const rawUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "https://iuzupzknnuimfyzcdtxl.supabase.co";
+  const rawKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!rawKey) return null;
+
+  let url = rawUrl.trim();
+  if (url.endsWith("/rest/v1/")) url = url.slice(0, -9);
+  if (url.endsWith("/rest/v1")) url = url.slice(0, -8);
+  if (url.endsWith("/")) url = url.slice(0, -1);
+
+  try {
+    return createClient(url, rawKey);
+  } catch {
+    return null;
+  }
+}
 
 @Injectable()
 export class AboutService {
@@ -279,7 +297,39 @@ Cities and Municipalities Competitiveness Index (CMCI) 2024. (n.d.). Department 
     };
   }
 
-  getServices() {
+  async getServices() {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("municipal_services")
+          .select("*, departments:office_responsible_id(id, name)")
+          .is("deleted_at", null)
+          .order("name", { ascending: true });
+
+        if (!error && data) {
+          return data.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            slug: s.slug || s.id,
+            description: s.description || "",
+            purpose: s.purpose || "",
+            requirements: Array.isArray(s.requirements) ? s.requirements : [],
+            processing_time: s.processing_time || "",
+            fees: s.fees || "",
+            office_responsible_id: s.office_responsible_id || null,
+            office_responsible: s.departments?.name || s.office_responsible || "Municipal Office",
+            office_hours: s.office_hours || "Monday to Friday, 8:00 AM - 5:00 PM",
+            contact_info: s.contact_info || "",
+            physical_address: s.physical_address || "",
+            status: s.status || "available",
+            downloadable_forms: Array.isArray(s.downloadable_forms) ? s.downloadable_forms : []
+          }));
+        }
+      } catch (e) {
+        console.warn("[AboutService] Failed to fetch municipal_services from Supabase:", e);
+      }
+    }
     return [
       { name: "Business Licensing", description: "Issuance of permits for local businesses and investment promotions." },
       { name: "Health Services", description: "Primary healthcare, emergency services, and public health programs." },

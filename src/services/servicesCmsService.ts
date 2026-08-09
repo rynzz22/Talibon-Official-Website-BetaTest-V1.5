@@ -2,7 +2,6 @@ import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { logCmsAction, ServiceCmsItem } from "./cmsService";
 import { isMockAllowed } from "../lib/mode";
 
-//manual deployment test
 const INITIAL_SERVICES: ServiceCmsItem[] = [
   {
     id: "apply-permit",
@@ -54,6 +53,10 @@ const INITIAL_SERVICES: ServiceCmsItem[] = [
   }
 ];
 
+const isValidUuid = (str: string | null | undefined): boolean =>
+  typeof str === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim());
+
 function getStorageServices(): ServiceCmsItem[] {
   if (typeof localStorage === 'undefined') return INITIAL_SERVICES;
   const data = localStorage.getItem("cms_data:services_cms");
@@ -76,6 +79,7 @@ export const servicesCmsService = {
         const { data, error } = await supabase
           .from("municipal_services")
           .select("*, departments:office_responsible_id(id, name)")
+          .is("deleted_at", null)
           .order("name", { ascending: true });
         if (error) throw error;
         if (data) {
@@ -113,7 +117,12 @@ export const servicesCmsService = {
   },
 
   async createService(item: Omit<ServiceCmsItem, "id">, userEmail: string): Promise<ServiceCmsItem> {
-    const officeRespId = item.office_responsible_id || (item.office_responsible && item.office_responsible.trim() !== "" ? item.office_responsible.trim() : null);
+    const officeRespId = isValidUuid(item.office_responsible_id)
+      ? item.office_responsible_id
+      : isValidUuid(item.office_responsible)
+      ? item.office_responsible
+      : null;
+
     const payload = {
       name: item.name,
       slug: item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
@@ -189,7 +198,8 @@ export const servicesCmsService = {
     if (item.processing_time !== undefined) payload.processing_time = item.processing_time || null;
     if (item.fees !== undefined) payload.fees = item.fees || null;
     if (item.office_responsible !== undefined || item.office_responsible_id !== undefined) {
-      payload.office_responsible_id = item.office_responsible_id || item.office_responsible || null;
+      const candidate = item.office_responsible_id || item.office_responsible;
+      payload.office_responsible_id = isValidUuid(candidate) ? candidate : null;
       if (item.office_responsible) payload.office_responsible = item.office_responsible;
     }
     if (item.office_hours !== undefined) payload.office_hours = item.office_hours || null;
@@ -254,7 +264,7 @@ export const servicesCmsService = {
       try {
         const { error } = await supabase
           .from("municipal_services")
-          .delete()
+          .update({ deleted_at: new Date().toISOString() })
           .eq("id", id);
         if (error) throw error;
         await logCmsAction(userEmail, "DELETE", "municipal_services", id);

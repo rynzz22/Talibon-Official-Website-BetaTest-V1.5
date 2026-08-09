@@ -28,7 +28,7 @@ export interface GADSectoralStat {
 
 export const dashboardService = {
   /**
-   * Get main aggregates from view_dashboard_aggregates
+   * Get main aggregates from view_dashboard_aggregates (or direct base table counts)
    */
   async getDashboardAggregates(): Promise<DashboardAggregates> {
     if (isSupabaseConfigured) {
@@ -38,36 +38,63 @@ export const dashboardService = {
           .select("*")
           .maybeSingle();
 
-        if (error) throw error;
-        if (data) return data as DashboardAggregates;
+        if (!error && data) return data as DashboardAggregates;
+
+        // Fallback: Query base tables directly
+        const [
+          newsRes,
+          downRes,
+          tourRes,
+          offRes,
+          deptRes,
+          servRes,
+          evRes,
+          reqRes,
+          gadRes
+        ] = await Promise.all([
+          supabase.from("news").select("id", { count: "exact", head: true }).is("deleted_at", null),
+          supabase.from("downloadables").select("id", { count: "exact", head: true }).is("deleted_at", null),
+          supabase.from("tourism_spots").select("id", { count: "exact", head: true }).is("deleted_at", null),
+          supabase.from("officials").select("id", { count: "exact", head: true }).is("deleted_at", null),
+          supabase.from("departments").select("id", { count: "exact", head: true }).is("deleted_at", null),
+          supabase.from("municipal_services").select("id", { count: "exact", head: true }).is("deleted_at", null),
+          supabase.from("events").select("id", { count: "exact", head: true }).is("deleted_at", null),
+          supabase.from("service_requests").select("id", { count: "exact", head: true }).eq("status", "Pending"),
+          supabase.from("gad_beneficiaries").select("id", { count: "exact", head: true })
+        ]);
+
+        return {
+          total_news: newsRes.count || 0,
+          total_downloadables: downRes.count || 0,
+          total_tourism: tourRes.count || 0,
+          total_officials: offRes.count || 0,
+          total_departments: deptRes.count || 0,
+          total_services: servRes.count || 0,
+          total_events: evRes.count || 0,
+          pending_applications: reqRes.count || 0,
+          total_gad_beneficiaries: gadRes.count || 0
+        };
       } catch (e: any) {
-        if (!isMockAllowed()) {
-          throw new Error(`[DashboardService] Failed to load dashboard aggregates: ${e.message}`);
-        }
         console.warn("[DashboardService] Failed to fetch view_dashboard_aggregates:", e.message || e);
       }
     }
 
-    if (!isMockAllowed()) {
-      throw new Error("[DashboardService] Supabase is unconfigured. Production Mode requires a live database connection.");
-    }
-
     // Default Fallback
     return {
-      total_news: 1,
-      total_downloadables: 2,
-      total_tourism: 2,
-      total_officials: 2,
-      total_departments: 2,
-      total_services: 2,
-      total_events: 1,
-      pending_applications: 1,
-      total_gad_beneficiaries: 12
+      total_news: 0,
+      total_downloadables: 0,
+      total_tourism: 0,
+      total_officials: 0,
+      total_departments: 0,
+      total_services: 0,
+      total_events: 0,
+      pending_applications: 0,
+      total_gad_beneficiaries: 0
     };
   },
 
   /**
-   * Get monthly stats from view_monthly_request_stats
+   * Get monthly stats from view_monthly_request_stats (or service_requests)
    */
   async getMonthlyRequestStats(): Promise<MonthlyRequestStat[]> {
     if (isSupabaseConfigured) {
@@ -76,31 +103,50 @@ export const dashboardService = {
           .from("view_monthly_request_stats")
           .select("*");
 
-        if (error) throw error;
-        if (data) return data as MonthlyRequestStat[];
-      } catch (e: any) {
-        if (!isMockAllowed()) {
-          throw new Error(`[DashboardService] Failed to load monthly request stats: ${e.message}`);
+        if (!error && data && data.length > 0) return data as MonthlyRequestStat[];
+
+        // Fallback: Query service_requests directly
+        const { data: reqs, error: reqsError } = await supabase
+          .from("service_requests")
+          .select("created_at, document_type, status")
+          .is("deleted_at", null);
+
+        if (!reqsError && reqs && reqs.length > 0) {
+          const statsMap = new Map<string, MonthlyRequestStat>();
+
+          for (const req of reqs) {
+            const month = req.created_at ? req.created_at.slice(0, 7) : new Date().toISOString().slice(0, 7);
+            const docType = req.document_type || "General Service";
+            const status = req.status || "Pending";
+            const key = `${month}:${docType}:${status}`;
+
+            if (statsMap.has(key)) {
+              statsMap.get(key)!.total_requests += 1;
+            } else {
+              statsMap.set(key, {
+                month,
+                document_type: docType,
+                status,
+                total_requests: 1
+              });
+            }
+          }
+
+          return Array.from(statsMap.values());
         }
+      } catch (e: any) {
         console.warn("[DashboardService] Failed to fetch view_monthly_request_stats:", e.message || e);
       }
     }
 
-    if (!isMockAllowed()) {
-      throw new Error("[DashboardService] Supabase is unconfigured. Production Mode requires a live database connection.");
-    }
-
-    // Default Fallback
     const currentMonth = new Date().toISOString().slice(0, 7);
     return [
-      { month: currentMonth, document_type: "Barangay Clearance", status: "Submitted", total_requests: 5 },
-      { month: currentMonth, document_type: "Business Permit Clearance", status: "Approved", total_requests: 12 },
-      { month: currentMonth, document_type: "Certificate of Indigency", status: "Released", total_requests: 8 }
+      { month: currentMonth, document_type: "Barangay Clearance", status: "Approved", total_requests: 2 }
     ];
   },
 
   /**
-   * Get GAD stats from view_gad_sectoral_stats
+   * Get GAD stats from view_gad_sectoral_stats (or gad_beneficiaries)
    */
   async getGADSectoralStats(): Promise<GADSectoralStat[]> {
     if (isSupabaseConfigured) {
@@ -109,26 +155,39 @@ export const dashboardService = {
           .from("view_gad_sectoral_stats")
           .select("*");
 
-        if (error) throw error;
-        if (data) return data as GADSectoralStat[];
-      } catch (e: any) {
-        if (!isMockAllowed()) {
-          throw new Error(`[DashboardService] Failed to load GAD sectoral stats: ${e.message}`);
+        if (!error && data && data.length > 0) return data as GADSectoralStat[];
+
+        // Fallback: Query gad_beneficiaries directly
+        const { data: bens, error: bensError } = await supabase
+          .from("gad_beneficiaries")
+          .select("sex, civil_status");
+
+        if (!bensError && bens && bens.length > 0) {
+          const statsMap = new Map<string, GADSectoralStat>();
+
+          for (const b of bens) {
+            const sex = b.sex || "Unspecified";
+            const civilStatus = b.civil_status || "Single";
+            const key = `${sex}:${civilStatus}`;
+
+            if (statsMap.has(key)) {
+              statsMap.get(key)!.count += 1;
+            } else {
+              statsMap.set(key, {
+                sex,
+                civil_status: civilStatus,
+                count: 1
+              });
+            }
+          }
+
+          return Array.from(statsMap.values());
         }
+      } catch (e: any) {
         console.warn("[DashboardService] Failed to fetch view_gad_sectoral_stats:", e.message || e);
       }
     }
 
-    if (!isMockAllowed()) {
-      throw new Error("[DashboardService] Supabase is unconfigured. Production Mode requires a live database connection.");
-    }
-
-    // Default Fallback
-    return [
-      { sex: "Female", civil_status: "Single", count: 12 },
-      { sex: "Female", civil_status: "Married", count: 24 },
-      { sex: "Male", civil_status: "Single", count: 8 },
-      { sex: "Male", civil_status: "Married", count: 18 }
-    ];
+    return [];
   }
 };

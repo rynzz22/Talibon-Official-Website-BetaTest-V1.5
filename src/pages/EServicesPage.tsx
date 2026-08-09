@@ -7,6 +7,7 @@ import {
   ArrowLeft, Briefcase, Building2, MapPin, ChevronRight
 } from "lucide-react";
 import { certificateService } from "../services/certificateService";
+import { servicesCmsService } from "../services/servicesCmsService";
 import ECedulaForm from "../components/eservices/ECedula/ECedulaForm";
 import EBusinessPermitForm from "../components/eservices/EBusinessPermitForm";
 import EBuildingPermitForm from "../components/eservices/EBuildingPermitForm";
@@ -41,6 +42,23 @@ export default function EServicesPage() {
 
   // Service routing state: directory, e-cedula, business_permit, building_permit, zoning_clearance, barangay_clearance, certificate_of_indigency
   const [activeService, setActiveService] = useState<string>("directory");
+
+  // Dynamic CMS Municipal Services from live Supabase DB
+  const [cmsServices, setCmsServices] = useState<any[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadCmsServices() {
+      try {
+        const list = await servicesCmsService.getServices();
+        if (isMounted) setCmsServices(list);
+      } catch (e) {
+        console.warn("[EServicesPage] Error loading dynamic CMS services:", e);
+      }
+    }
+    loadCmsServices();
+    return () => { isMounted = false; };
+  }, []);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -704,6 +722,60 @@ export default function EServicesPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Dynamic Municipal Citizen Services from Live Database */}
+                  {cmsServices.length > 0 && (
+                    <div className="bg-white border border-brand-border rounded-[2.5rem] p-8 shadow-sm space-y-6">
+                      <div>
+                        <h2 className="text-xl font-black text-brand-text uppercase font-display tracking-tight">
+                          Municipal Services & Guides
+                        </h2>
+                        <p className="text-xs text-brand-muted font-bold uppercase tracking-widest mt-1">
+                          Official municipal service guides dynamically published by LGU departments
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        {cmsServices.map((s: any, idx: number) => (
+                          <Link
+                            key={s.id || idx}
+                            to={`/services/${s.slug || s.id}`}
+                            className="p-6 bg-white border border-brand-border hover:border-brand-primary/30 rounded-3xl cursor-pointer group transition-all flex flex-col justify-between min-h-[12rem] space-y-3"
+                          >
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-start">
+                                <div className="w-10 h-10 bg-sky-50 text-brand-primary rounded-2xl flex items-center justify-center">
+                                  <Building2 size={20} />
+                                </div>
+                                {s.status && (
+                                  <span className="px-2 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md border border-brand-primary/20 bg-brand-primary/10 text-brand-primary">
+                                    {s.status}
+                                  </span>
+                                )}
+                              </div>
+                              <div>
+                                <h3 className="text-sm font-black text-brand-text uppercase tracking-tight group-hover:text-brand-primary transition-colors font-display line-clamp-1">
+                                  {s.name}
+                                </h3>
+                                <p className="text-[11px] text-brand-muted leading-relaxed font-semibold mt-1 line-clamp-2">
+                                  {s.description}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between text-[9px] font-black text-brand-primary uppercase tracking-widest pt-2 border-t border-brand-border/60">
+                              <span className="text-slate-500 font-semibold truncate max-w-[120px]">
+                                {s.office_responsible || "Municipal Office"}
+                              </span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span>View Guide</span>
+                                <ChevronRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               ) : activeService === "e-cedula" ? (
                 <motion.div

@@ -1,11 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Retrieve environment variables safely via Vite import.meta.env
-const CANONICAL_SUPABASE_URL = 'https://iuzupzknnuimfyzcdtxl.supabase.co';
-const CANONICAL_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1enVwemtubnVpbWZ5emNkdHhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NTU5ODIsImV4cCI6MjEwMTMzMTk4Mn0.Sr02wKEyu5Ikoia3j8XSgh1kuLv6hTYCwzmQdo6de8k';
-
-const rawUrl = (import.meta.env && import.meta.env.VITE_SUPABASE_URL) || (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_URL || process.env?.SUPABASE_URL : undefined);
-const rawKey = (import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) || (import.meta.env && import.meta.env.VITE_SUPABASE_PUBLIC_KEY) || (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_ANON_KEY : undefined);
+// Retrieve environment variables safely
+const rawUrl = (import.meta as any)?.env?.VITE_SUPABASE_URL || (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_URL || process.env?.SUPABASE_URL : undefined);
+const rawKey = (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY || (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_ANON_KEY || process.env?.SUPABASE_SERVICE_ROLE_KEY : undefined);
 
 // Extract project ID from URL if possible
 const extractProjectId = (url: string | undefined): string => {
@@ -25,6 +22,7 @@ const extractProjectId = (url: string | undefined): string => {
 // Clean and sanitize URL
 const sanitizeUrl = (url: string | undefined): string => {
   if (!url) {
+    // Return production fallback if undefined
     return 'https://iuzupzknnuimfyzcdtxl.supabase.co';
   }
   
@@ -35,7 +33,7 @@ const sanitizeUrl = (url: string | undefined): string => {
     trimmed = trimmed.slice(0, -1);
   }
   
-  // Strip /rest/v1 if present
+  // Strip /rest/v1 if it is at the end of the URL
   if (trimmed.endsWith('/rest/v1')) {
     trimmed = trimmed.slice(0, -8);
   }
@@ -44,6 +42,7 @@ const sanitizeUrl = (url: string | undefined): string => {
     trimmed = trimmed.slice(0, -1);
   }
   
+  // Force correct production project URL if placeholder or invalid local host
   if (
     !trimmed || 
     trimmed.includes('placeholder-project') || 
@@ -57,13 +56,14 @@ const sanitizeUrl = (url: string | undefined): string => {
 };
 
 const supabaseUrl = sanitizeUrl(rawUrl);
-const supabaseAnonKey = (rawKey && rawKey.trim() !== '') ? rawKey.trim() : CANONICAL_SUPABASE_ANON_KEY;
+// Default to empty or placeholder to avoid client crash, but throw during action if missing
+const supabaseAnonKey = rawKey ? rawKey.trim() : 'placeholder-anon-key';
 
-if (!rawKey) {
-  console.info(`[Supabase Info] VITE_SUPABASE_ANON_KEY not set in env, using canonical project anon key.`);
-}
-
-export const isSupabaseConfigured = !!supabaseUrl && !!supabaseAnonKey;
+export const isSupabaseConfigured = 
+  !!supabaseUrl && 
+  !supabaseUrl.includes('placeholder-project') && 
+  !!supabaseAnonKey && 
+  supabaseAnonKey !== 'placeholder-anon-key';
 
 export const supabase = createClient(
   supabaseUrl,
@@ -81,7 +81,7 @@ export const supabase = createClient(
 export function logSupabaseDiagnostics(context: string, errorDetail?: any): void {
   const currentProjectId = extractProjectId(supabaseUrl);
   const maskKey = (key: string | undefined): string => {
-    if (!key) return "MISSING";
+    if (!key || key === 'placeholder-anon-key') return "MISSING/PLACEHOLDER";
     if (key.length <= 10) return "***";
     return `${key.substring(0, 5)}...${key.substring(key.length - 5)}`;
   };
@@ -94,8 +94,10 @@ export function logSupabaseDiagnostics(context: string, errorDetail?: any): void
     isConfigured: isSupabaseConfigured
   });
   console.log("Current Project ID   :", currentProjectId);
+  console.log("Network Status       :", navigator.onLine ? "ONLINE" : "OFFLINE");
   console.log("API Key Masked       :", maskKey(supabaseAnonKey));
   
+  // Safe initialization check
   let isClientInit = false;
   try {
     isClientInit = typeof supabase !== 'undefined' && !!supabase;
@@ -104,12 +106,29 @@ export function logSupabaseDiagnostics(context: string, errorDetail?: any): void
   }
   console.log("Is Client Initialized:", isClientInit);
   
+  // Attempt to check session
+  try {
+    const sessionStr = typeof localStorage !== 'undefined' ? (localStorage.getItem("sb-vifrifxpugdqbwccoyxe-auth-token") || localStorage.getItem(`sb-${currentProjectId}-auth-token`)) : null;
+    console.log("Auth Session Exists :", !!sessionStr);
+  } catch (err) {
+    console.log("Auth Session Error  :", err);
+  }
+
   if (errorDetail) {
     console.error("Diagnostic Error Info:", errorDetail);
   }
   console.groupEnd();
 }
 
-// Perform initial log
-logSupabaseDiagnostics("Initialization Check");
+// Log warning if env variables are missing or placeholders, allowing offline/mock fallback
+if (!isSupabaseConfigured) {
+  const warnMsg = 
+    `[Supabase Configuration Warning] Missing or invalid database credentials.\n` +
+    `Expected VITE_SUPABASE_URL (currently: "${rawUrl || 'undefined'}") and VITE_SUPABASE_ANON_KEY to be configured in settings.\n` +
+    `Application is running in offline/mock fallback mode.`;
+  
+  console.warn(warnMsg);
+}
 
+// Perform initial log AFTER client initialization
+logSupabaseDiagnostics("Initialization Check");
