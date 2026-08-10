@@ -312,7 +312,7 @@ Cities and Municipalities Competitiveness Index (CMCI) 2024. (n.d.). Department 
             id: s.id,
             name: s.name,
             slug: s.slug || s.id,
-            description: s.description || "",
+            description: s.description || "", 
             purpose: s.purpose || "",
             requirements: Array.isArray(s.requirements) ? s.requirements : [],
             processing_time: s.processing_time || "",

@@ -1,4 +1,5 @@
 import { Module, MiddlewareConsumer, NestModule, RequestMethod } from "@nestjs/common";
+import { APP_GUARD, APP_FILTER } from "@nestjs/core";
 import * as path from "path";
 import * as express from "express";
 
@@ -21,6 +22,11 @@ import { PaymentsController } from "./api/payments/payments.controller";
 import { PaymentsService } from "./api/payments/payments.service";
 
 import { SupabaseService } from "./supabase.service";
+import { RateLimiterGuard } from "./security/rate-limiter.guard";
+import { AuthGuard } from "./security/auth.guard";
+import { SecurityHeadersMiddleware } from "./security/security-headers.middleware";
+import { CacheControlMiddleware } from "./security/cache-control.middleware";
+import { AllExceptionsFilter } from "./security/all-exceptions.filter";
 
 @Module({
   imports: [PaymentsModule],
@@ -44,10 +50,27 @@ import { SupabaseService } from "./supabase.service";
     TourismService,
     FormsService,
     PaymentsService,
+    {
+      provide: APP_GUARD,
+      useClass: RateLimiterGuard
+    },
+    {
+      provide: APP_GUARD,
+      useClass: AuthGuard
+    },
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter
+    }
   ],
 })
 export class AppModule implements NestModule {
   async configure(consumer: MiddlewareConsumer) {
+    // Apply security headers & cache control to all routes
+    consumer
+      .apply(SecurityHeadersMiddleware, CacheControlMiddleware)
+      .forRoutes({ path: "*", method: RequestMethod.ALL });
+
     if (process.env.NODE_ENV !== "production") {
       const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
@@ -66,7 +89,7 @@ export class AppModule implements NestModule {
       
       // Serve index.html for SPA fallback
       consumer
-        .apply((req, res, next) => {
+        .apply((req: express.Request, res: express.Response, next: express.NextFunction) => {
           if (!req.path.startsWith("/api")) {
             res.sendFile(path.join(distPath, "index.html"));
           } else {
