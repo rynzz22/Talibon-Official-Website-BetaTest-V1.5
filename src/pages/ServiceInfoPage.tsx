@@ -42,14 +42,26 @@ const ServiceInfoPage: React.FC = () => {
         return;
       }
 
+      const rawParam = decodeURIComponent(slug).trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawParam);
+
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from("municipal_services")
           .select("*, departments:office_responsible_id(id, name)")
-          .is("deleted_at", null)
-          .or(`slug.eq.${slug},id.eq.${slug}`);
+          .is("deleted_at", null);
 
-        if (!error && data && data.length > 0) {
+        if (isUuid) {
+          query = query.or(`id.eq.${rawParam},slug.eq.${rawParam}`);
+        } else {
+          query = query.or(`slug.eq.${rawParam},slug.eq.${rawParam.toLowerCase()}`);
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+          console.error("[ServiceInfoPage] Error loading service from Supabase:", error);
+        } else if (data && data.length > 0) {
           const item = data[0];
           const mapped: ServiceInfo = {
             id: item.slug || item.id,
@@ -75,9 +87,10 @@ const ServiceInfoPage: React.FC = () => {
         console.warn("[ServiceInfoPage] Error loading service from Supabase:", err);
       }
 
-      if (SERVICES_DATA[slug]) {
+      const fallbackKey = rawParam.toLowerCase();
+      if (SERVICES_DATA[fallbackKey] || SERVICES_DATA[rawParam]) {
         if (isMounted) {
-          setService(SERVICES_DATA[slug]);
+          setService(SERVICES_DATA[fallbackKey] || SERVICES_DATA[rawParam]);
           setLoading(false);
         }
       } else {
@@ -391,3 +404,4 @@ const ServiceInfoPage: React.FC = () => {
 };
 
 export default ServiceInfoPage;
+//TEST TO COMMIT

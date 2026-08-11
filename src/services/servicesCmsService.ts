@@ -123,9 +123,16 @@ export const servicesCmsService = {
       ? item.office_responsible
       : null;
 
+    const rawSlug = item.slug && item.slug.trim() ? item.slug : item.name;
+    const computedSlug = rawSlug
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
     const payload = {
       name: item.name,
-      slug: item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+      slug: computedSlug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
       description: item.description,
       purpose: item.purpose || null,
       requirements: item.requirements || [],
@@ -191,7 +198,9 @@ export const servicesCmsService = {
   async updateService(id: string, item: Partial<ServiceCmsItem>, userEmail: string): Promise<ServiceCmsItem> {
     const payload: any = {};
     if (item.name !== undefined) payload.name = item.name;
-    if (item.slug !== undefined) payload.slug = item.slug;
+    if (item.slug !== undefined) {
+      payload.slug = item.slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    }
     if (item.description !== undefined) payload.description = item.description;
     if (item.purpose !== undefined) payload.purpose = item.purpose || null;
     if (item.requirements !== undefined) payload.requirements = item.requirements;
@@ -286,3 +295,4 @@ export const servicesCmsService = {
     return true;
   }
 };
+// FOR TESTING 
