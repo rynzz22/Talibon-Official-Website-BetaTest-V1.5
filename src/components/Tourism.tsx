@@ -8,21 +8,21 @@ export default function Tourism() {
       title: "Danajon Bank",
       category: "Double Barrier Reef",
       description: "One of only six double barrier reefs in the world.",
-      image: "https://scontent.fceb8-1.fna.fbcdn.net/v/t39.30808-6/515210121_1160056812829592_2860987244901239199_n.jpg?stp=dst-jpg_s960x960_tt6&_nc_cat=109&ccb=1-7&_nc_sid=7b2446&_nc_eui2=AeGKlbFLpI91Umq89OhLdQZIC0eTEzBI_McLR5MTMEj8x_LA7351Kwmy3VsRio7QBOrXYdzLEqVB-Dn6FYh462lc&_nc_ohc=mPfZXpqq_44Q7kNvwFw1_2x&_nc_oc=AdoSqK_dwueE1mFUgTmbUmq1Lkm3jhFHbf9rWIWiWBWHtt_RShtK1FFAWha6sBi53j0&_nc_zt=23&_nc_ht=scontent.fceb8-1.fna&_nc_gid=BZzd4547digyOqAp-MBQ4A&_nc_ss=7a3a8&oh=00_Af3KotQ-zSQYKX0_MFgTR69n7tr2J15UstgFynEpTO4nbA&oe=69D8E182",
+      image: "/images/danajon_bank.jpg",
       href: "/tourism/spots"
     },
     {
       title: "Holy Trinity",
       category: "Historical Site",
       description: "A beautiful landmark of faith and history.",
-      image: "https://scontent.fceb8-1.fna.fbcdn.net/v/t39.30808-6/667740534_1277647481168991_7857431279534299933_n.jpg?_nc_cat=104&ccb=1-7&_nc_sid=dd6889&_nc_eui2=AeHT1FEMpH6CbscAmAQK7NNmXtnW4m4vNIFe2dbibi80gUJ7zeWxxgH-d5SdWb5h5TAa_JeABEjpa1KmwVWX8MeT&_nc_ohc=aSKHGoSOdIwQ7kNvwFoCV-p&_nc_oc=AdowBLU6SqSMhGXtnJegRHGSw3C3vlGZ_e7nRZS3i-iUj30RQmC3GmM5_Mza9m-bvCQ&_nc_zt=23&_nc_ht=scontent.fceb8-1.fna&_nc_gid=zVwSwzZ9Yd_AU34sTYlfkw&_nc_ss=7a3a8&oh=00_Af2YHp2-giTY8FpmLqnEf1IRSOR4EkRQwpSjXflAWU6sbg&oe=69D90688",
+      image: "/images/holy_trinity.jpg",
       href: "/tourism/spots"
     },
     {
       title: "Sandbars",
       category: "Nature & Beach",
       description: "Explore the pristine islands scattered across the bank.",
-      image: "https://scontent.fceb8-1.fna.fbcdn.net/v/t39.30808-6/515210121_1160056812829592_2860987244901239199_n.jpg?stp=dst-jpg_s960x960_tt6&_nc_cat=109&ccb=1-7&_nc_sid=7b2446&_nc_eui2=AeGKlbFLpI91Umq89OhLdQZIC0eTEzBI_McLR5MTMEj8x_LA7351Kwmy3VsRio7QBOrXYdzLEqVB-Dn6FYh462lc&_nc_ohc=mPfZXpqq_44Q7kNvwFw1_2x&_nc_oc=AdoSqK_dwueE1mFUgTmbUmq1Lkm3jhFHbf9rWIWiWBWHtt_RShtK1FFAWha6sBi53j0&_nc_zt=23&_nc_ht=scontent.fceb8-1.fna&_nc_gid=BZzd4547digyOqAp-MBQ4A&_nc_ss=7a3a8&oh=00_Af3KotQ-zSQYKX0_MFgTR69n7tr2J15UstgFynEpTO4nbA&oe=69D8E182",
+      image: "/images/sandbars.jpg",
       href: "/tourism/spots"
     },
   ];
