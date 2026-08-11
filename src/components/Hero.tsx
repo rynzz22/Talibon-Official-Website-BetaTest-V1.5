@@ -167,8 +167,8 @@ const Hero: React.FC<HeroProps> = ({ overrideTitle, overrideSubtitle }) => {
             
             {/* Description Paragraph */}
             <p 
-              className="text-white text-base sm:text-lg lg:text-xl font-medium leading-relaxed sm:leading-8 max-w-2xl mb-8 sm:mb-10 drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)] font-display"
-              style={{ fontFamily: "'Outfit', sans-serif" }}
+              className="text-white text-base sm:text-lg lg:text-xl font-medium leading-relaxed sm:leading-8 max-w-2xl mb-8 sm:mb-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] tracking-wide"
+              style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
             >
               {overrideSubtitle || (
                 "Talibon stands as Bohol's premier center for seafood & fisheries, eco-agricultural development, and vibrant municipal tourism — committed to innovation, environmental stewardship, and citizen service."
