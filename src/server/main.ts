@@ -30,13 +30,24 @@ async function bootstrap() {
     origin: (origin, callback) => {
       // Allow requests with no origin (e.g. mobile apps, curl, same-origin SPA)
       if (!origin) return callback(null, true);
-      const allowedOrigins = process.env.ALLOWED_ORIGINS
-        ? process.env.ALLOWED_ORIGINS.split(",")
+
+      const rawAllowed = process.env.ALLOWED_ORIGINS
+        ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim()).filter(Boolean)
         : [];
-      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin) || origin.includes("localhost") || origin.includes("run.app") || origin.includes("ai.studio")) {
+
+      // Check explicit allowed origins or development / Cloud Run preview origins
+      if (
+        rawAllowed.includes(origin) ||
+        origin.includes("localhost") ||
+        origin.includes("127.0.0.1") ||
+        origin.includes("run.app") ||
+        origin.includes("ai.studio") ||
+        process.env.NODE_ENV !== "production"
+      ) {
         return callback(null, true);
       }
-      return callback(null, true); // Permissive in dev, validated in prod
+
+      return callback(null, false);
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
