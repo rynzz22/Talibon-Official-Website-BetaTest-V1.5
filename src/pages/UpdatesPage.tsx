@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, Facebook, ExternalLink, Lock } from 'lucide-react';
 
 const UpdatesPage: React.FC = () => {
-  const [activeFeed, setActiveFeed] = React.useState<'pio' | 'main'>('pio');
+  const [activeFeed, setActiveFeed] = useState<'pio' | 'main'>('pio');
+  const [loadedFeeds, setLoadedFeeds] = useState<{ [key: string]: boolean }>({});
   
   const feeds = {
     pio: {
@@ -16,6 +17,12 @@ const UpdatesPage: React.FC = () => {
       url: "https://www.facebook.com/TalibonOfficialPage",
       handle: "@TalibonOfficialPage"
     }
+  };
+
+  const isCurrentFeedLoaded = !!loadedFeeds[activeFeed];
+
+  const handleLoadFeed = () => {
+    setLoadedFeeds(prev => ({ ...prev, [activeFeed]: true }));
   };
 
   return (
@@ -53,21 +60,61 @@ const UpdatesPage: React.FC = () => {
             key={activeFeed}
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
-            className="bg-white rounded-xl sm:rounded-2xl border border-brand-border shadow-lg shadow-black/5 p-3 sm:p-4 overflow-hidden"
+            className="bg-white rounded-xl sm:rounded-2xl border border-brand-border shadow-lg shadow-black/5 p-4 overflow-hidden min-h-[500px] flex flex-col justify-center"
           >
-            <div className="w-full">
-              <iframe 
-                src={`https://www.facebook.com/plugins/page.php?href=${encodeURIComponent(feeds[activeFeed].url)}&tabs=timeline&width=800&height=1200&small_header=false&adapt_container_width=true&hide_cover=false&show_facepile=true&appId`} 
-                width="100%" 
-                height="700" 
-                style={{ border: 'none', overflow: 'hidden', borderRadius: '1rem' }} 
-                scrolling="no" 
-                frameBorder="0" 
-                allowFullScreen={true} 
-                allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                title={`Talibon Facebook Feed - ${feeds[activeFeed].name}`}
-              />
-            </div>
+            {isCurrentFeedLoaded ? (
+              <div className="w-full">
+                <iframe 
+                  src={`https://www.facebook.com/plugins/page.php?href=${encodeURIComponent(feeds[activeFeed].url)}&tabs=timeline&width=800&height=1200&small_header=false&adapt_container_width=true&hide_cover=false&show_facepile=true&appId`} 
+                  width="100%" 
+                  height="700" 
+                  style={{ border: 'none', overflow: 'hidden', borderRadius: '1rem' }} 
+                  scrolling="no" 
+                  frameBorder="0" 
+                  allowFullScreen={true} 
+                  allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                  title={`Talibon Facebook Feed - ${feeds[activeFeed].name}`}
+                />
+              </div>
+            ) : (
+              <div className="text-center py-12 px-4 space-y-4 max-w-md mx-auto">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-[#1877F2]/10 text-[#1877F2] flex items-center justify-center shadow-xs">
+                  <Facebook size={36} />
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-black tracking-widest text-[#1877F2] uppercase">
+                    {feeds[activeFeed].name}
+                  </span>
+                  <h3 className="text-lg font-bold text-slate-900 font-display">
+                    Interactive Social Media Stream
+                  </h3>
+                  <p className="text-xs text-slate-500 leading-relaxed font-normal">
+                    Facebook content is provided by Meta. Loading this content may transfer information to Facebook (such as IP address and browser cookies).
+                  </p>
+                </div>
+                <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    onClick={handleLoadFeed}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-[#1877F2] hover:bg-[#166fe5] text-white rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <Facebook size={16} />
+                    Load Facebook Feed
+                  </button>
+                  <a
+                    href={feeds[activeFeed].url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <span>Open on Facebook</span>
+                    <ExternalLink size={13} />
+                  </a>
+                </div>
+                <p className="text-[10px] text-slate-400 font-medium">
+                  Privacy-first: No tracking requests to Meta are executed until you click Load.
+                </p>
+              </div>
+            )}
           </motion.div>
         </div>
 

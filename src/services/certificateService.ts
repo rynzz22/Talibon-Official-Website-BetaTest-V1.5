@@ -24,13 +24,48 @@ export interface CertificateRequest {
   }[];
 }
 
-// Local Storage key for fallback requests when Supabase is unreachable or in mock mode
+// Local Storage key for fallback requests when Supabase is unreachable or for citizen tracking convenience
 const LOCAL_REQUESTS_KEY = "talibon_local_certificate_requests";
+const LEGACY_REQUESTS_KEY = "talibon_citizen_requests";
+const REQUEST_RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // 30-day retention under privacy compliance
 
 export function getLocalRequests(): CertificateRequest[] {
   try {
     const raw = localStorage.getItem(LOCAL_REQUESTS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      localStorage.removeItem(LOCAL_REQUESTS_KEY);
+      return [];
+    }
+
+    const now = Date.now();
+    let hasExpired = false;
+
+    // Filter valid, non-expired entries
+    const validRequests: CertificateRequest[] = parsed.filter((item: any) => {
+      if (!item || typeof item !== "object" || !item.ticketId) return false;
+      const submittedTime = item.submittedAt ? new Date(item.submittedAt).getTime() : 0;
+      const isExpired = item.expiresAt ? now > item.expiresAt : (submittedTime > 0 && now - submittedTime > REQUEST_RETENTION_MS);
+      if (isExpired) {
+        hasExpired = true;
+        return false;
+      }
+      return true;
+    });
+
+    // Write back sanitized non-expired data if any were pruned
+    if (hasExpired || validRequests.length !== parsed.length) {
+      localStorage.setItem(LOCAL_REQUESTS_KEY, JSON.stringify(validRequests));
+    }
+
+    // Clean legacy key if exists
+    if (localStorage.getItem(LEGACY_REQUESTS_KEY)) {
+      localStorage.removeItem(LEGACY_REQUESTS_KEY);
+    }
+
+    return validRequests;
   } catch {
     return [];
   }
@@ -38,12 +73,42 @@ export function getLocalRequests(): CertificateRequest[] {
 
 export function saveLocalRequest(req: CertificateRequest): void {
   try {
+    if (!req || !req.ticketId) return;
+
+    // Data minimization: Do NOT persist citizen sensitive personally identifiable info (PII) like full name, email, phone, purpose details, or attachments in localStorage
+    const sanitizedStub: CertificateRequest & { expiresAt: number } = {
+      ticketId: req.ticketId,
+      documentType: req.documentType || "Municipal Request",
+      barangay: req.barangay || "Poblacion",
+      fullName: "", // PII stripped for browser storage privacy
+      email: "",    // PII stripped
+      mobileNumber: "", // PII stripped
+      purpose: "",  // PII stripped
+      attachments: [], // PII stripped
+      submittedAt: req.submittedAt || new Date().toISOString(),
+      status: req.status || "Submitted",
+      history: req.history || [],
+      expiresAt: Date.now() + REQUEST_RETENTION_MS
+    };
+
     const existing = getLocalRequests();
-    const filtered = existing.filter(r => r.ticketId !== req.ticketId);
-    filtered.unshift(req);
-    localStorage.setItem(LOCAL_REQUESTS_KEY, JSON.stringify(filtered));
+    const filtered = existing.filter(r => r.ticketId !== sanitizedStub.ticketId);
+    filtered.unshift(sanitizedStub);
+    
+    // Cap stored tickets to 20 most recent
+    const capped = filtered.slice(0, 20);
+    localStorage.setItem(LOCAL_REQUESTS_KEY, JSON.stringify(capped));
   } catch (e) {
     console.warn("[CertificateService] Failed to save local request fallback:", e);
+  }
+}
+
+export function clearLocalRequests(): void {
+  try {
+    localStorage.removeItem(LOCAL_REQUESTS_KEY);
+    localStorage.removeItem(LEGACY_REQUESTS_KEY);
+  } catch (e) {
+    console.warn("[CertificateService] Failed to clear local requests:", e);
   }
 }
 

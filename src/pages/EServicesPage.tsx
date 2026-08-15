@@ -6,7 +6,7 @@ import {
   Sparkles, ShieldAlert, X, Copy, RefreshCw, File, HelpCircle, FileCheck,
   ArrowLeft, Briefcase, Building2, MapPin, ChevronRight
 } from "lucide-react";
-import { certificateService } from "../services/certificateService";
+import { certificateService, getLocalRequests, clearLocalRequests } from "../services/certificateService";
 import { servicesCmsService } from "../services/servicesCmsService";
 import ECedulaForm from "../components/eservices/ECedula/ECedulaForm";
 import EBusinessPermitForm from "../components/eservices/EBusinessPermitForm";
@@ -80,6 +80,12 @@ export default function EServicesPage() {
   const [searchTrackId, setSearchTrackId] = useState("");
   const [trackedRequest, _setTrackedRequest] = useState<CertificateRequest | null>(null);
   const [activeTrackTab, setActiveTrackTab] = useState<"timeline" | "summary">("timeline");
+  const [recentTickets, setRecentTickets] = useState<any[]>(() => getLocalRequests());
+
+  const handleClearHistory = () => {
+    clearLocalRequests();
+    setRecentTickets([]);
+  };
 
   const normalizeStatus = (dbStatus: string): string => {
     if (!dbStatus) return "Submitted";
@@ -1025,6 +1031,45 @@ export default function EServicesPage() {
                   </button>
                 </div>
               </form>
+
+              {/* Recent Requests Chips */}
+              {recentTickets.length > 0 && !trackSearched && (
+                <div className="pt-1 space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    <span>Recent On This Device</span>
+                    <button
+                      type="button"
+                      onClick={handleClearHistory}
+                      className="text-slate-400 hover:text-red-500 transition-colors"
+                      title="Clear local tracking history"
+                    >
+                      Clear History
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {recentTickets.slice(0, 4).map((ticket: any) => (
+                      <button
+                        key={ticket.ticketId}
+                        type="button"
+                        onClick={() => {
+                          setSearchTrackId(ticket.ticketId);
+                          // Trigger search
+                          certificateService.getRequestStatus(ticket.ticketId).then(res => {
+                            if (res) {
+                              setTrackedRequest(res);
+                              setTrackSearched(true);
+                              setTrackError(null);
+                            }
+                          });
+                        }}
+                        className="px-2 py-1 bg-slate-100 hover:bg-brand-primary/10 hover:text-brand-primary rounded-lg text-[10px] font-mono font-bold text-slate-700 transition-all border border-slate-200"
+                      >
+                        {ticket.ticketId}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Search Display Panel */}
               <AnimatePresence mode="wait">

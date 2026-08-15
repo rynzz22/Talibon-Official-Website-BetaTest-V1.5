@@ -140,28 +140,6 @@ export default function EBuildingPermitForm({ onSuccess }: EBuildingPermitFormPr
       };
 
       saveLocalRequest(fallbackRequest);
-
-      // Add to local state of citizen requests
-      try {
-        const saved = localStorage.getItem('talibon_citizen_requests');
-        const list = saved ? JSON.parse(saved) : [];
-        list.unshift({
-          id: `req-${generatedId}`,
-          citizenName: formData.propertyOwner,
-          type: "Building Permit",
-          description: `Building Permit application (${formData.constructionType}) submitted for lot in Barangay ${formData.barangay}.`,
-          submittedAt: fallbackRequest.submittedAt,
-          assignedDeptId: "engineering",
-          status: "PENDING",
-          priority: "HIGH",
-          trackingNumber: generatedId,
-          attachments: fallbackRequest.attachments
-        });
-        localStorage.setItem('talibon_citizen_requests', JSON.stringify(list));
-      } catch (e) {
-        console.error("Failed to sync fallback requests to localStorage", e);
-      }
-
       onSuccess(fallbackRequest);
     } finally {
       setIsSubmitting(false);

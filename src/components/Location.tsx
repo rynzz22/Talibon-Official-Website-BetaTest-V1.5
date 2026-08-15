@@ -1,7 +1,11 @@
+import { useState } from "react";
 import { motion } from "motion/react";
-import { MapPin, Navigation, Globe, Ruler } from "lucide-react";
+import { MapPin, Navigation, Globe, Ruler, ExternalLink, Map } from "lucide-react";
 
 export default function Location() {
+  const [loadMap, setLoadMap] = useState(false);
+  const mapsUrl = "https://www.google.com/maps/place/Talibon,+Bohol";
+
   return (
     <section id="location" className="py-32 bg-brand-surface relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -43,7 +47,7 @@ export default function Location() {
 
             <div className="pt-8">
               <a 
-                href="https://www.google.com/maps/place/Talibon,+Bohol" 
+                href={mapsUrl} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="minimal-button-primary inline-flex items-center gap-2"
@@ -59,18 +63,58 @@ export default function Location() {
             viewport={{ once: true }}
             className="relative"
           >
-            <div className="aspect-square rounded-[3rem] overflow-hidden shadow-2xl border-4 border-white dark:border-dark-border bg-brand-surface dark:bg-dark-surface">
-              <iframe 
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15707.382483838237!2d124.321852028686!3d10.152377484462102!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3307cc27f5e8e8e9%3A0x63359784347716cc!2sTalibon%2C%20Bohol!5e0!3m2!1sen!2sph!4v1713290000000!5m2!1sen!2sph" 
-                width="100%" 
-                height="100%" 
-                style={{ border: 0 }} 
-                allowFullScreen={true} 
-                loading="lazy" 
-                referrerPolicy="no-referrer-when-downgrade"
-                title="Google Maps - Talibon, Bohol"
-                className="brightness-90 dark:invert-[0.9] dark:hue-rotate-180"
-              />
+            <div className="aspect-square rounded-[3rem] overflow-hidden shadow-2xl border-4 border-white dark:border-dark-border bg-white dark:bg-dark-surface flex items-center justify-center">
+              {loadMap ? (
+                <iframe 
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15707.382483838237!2d124.321852028686!3d10.152377484462102!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3307cc27f5e8e8e9%3A0x63359784347716cc!2sTalibon%2C%20Bohol!5e0!3m2!1sen!2sph!4v1713290000000!5m2!1sen!2sph" 
+                  width="100%" 
+                  height="100%" 
+                  style={{ border: 0 }} 
+                  allowFullScreen={true} 
+                  loading="lazy" 
+                  referrerPolicy="no-referrer-when-downgrade"
+                  title="Google Maps - Talibon, Bohol"
+                  className="brightness-90 dark:invert-[0.9] dark:hue-rotate-180"
+                />
+              ) : (
+                <div className="p-8 text-center space-y-4 max-w-sm">
+                  <div className="w-16 h-16 mx-auto rounded-3xl bg-brand-primary/10 text-brand-primary flex items-center justify-center shadow-xs">
+                    <Map size={32} />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-brand-primary">
+                      Geographic Preview
+                    </span>
+                    <h3 className="text-xl font-bold text-slate-900 font-display">
+                      Talibon, Bohol Map
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                      Map tiles are provided by Google. Loading connects to external Google servers.
+                    </p>
+                  </div>
+                  <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2.5">
+                    <button
+                      onClick={() => setLoadMap(true)}
+                      className="w-full sm:w-auto px-5 py-2.5 bg-brand-primary hover:bg-brand-primary/90 text-white rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                    >
+                      <MapPin size={15} />
+                      Load Interactive Map
+                    </button>
+                    <a
+                      href={mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <span>Open Link</span>
+                      <ExternalLink size={13} />
+                    </a>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    No location data is transferred until activated.
+                  </p>
+                </div>
+              )}
             </div>
           </motion.div>
         </div>

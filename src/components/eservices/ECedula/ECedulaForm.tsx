@@ -215,27 +215,6 @@ export default function ECedulaForm({ onSuccess }: ECedulaFormProps) {
         totalTax: taxCalculation.total
       };
 
-      // Add to local state of citizen requests
-      try {
-        const saved = localStorage.getItem('talibon_citizen_requests');
-        const list = saved ? JSON.parse(saved) : [];
-        list.unshift({
-          id: `req-${ticketId}`,
-          citizenName: `${formData.firstName} ${formData.lastName}`,
-          type: "Cedula",
-          description: `Cedula (CTC) application submitted for Barangay ${formData.barangay}. Total tax: PHP ${taxCalculation.total}.`,
-          submittedAt: new Date().toISOString(),
-          assignedDeptId: "treasury",
-          status: "PENDING",
-          priority: "HIGH",
-          trackingNumber: ticketId,
-          attachments: []
-        });
-        localStorage.setItem('talibon_citizen_requests', JSON.stringify(list));
-      } catch (e) {
-        console.error("Failed to sync fallback requests to localStorage", e);
-      }
-
       setReceipt(newReceipt);
       if (onSuccess) {
         onSuccess(newReceipt);

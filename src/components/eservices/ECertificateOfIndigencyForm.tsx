@@ -122,28 +122,6 @@ export default function ECertificateOfIndigencyForm({ onSuccess }: ECertificateO
       };
 
       saveLocalRequest(fallbackRequest);
-
-      // Add to local state of citizen requests
-      try {
-        const saved = localStorage.getItem('talibon_citizen_requests');
-        const list = saved ? JSON.parse(saved) : [];
-        list.unshift({
-          id: `req-${generatedId}`,
-          citizenName: formData.fullName,
-          type: "Certificate of Indigency",
-          description: `Certificate of Indigency application submitted for ${formData.fullName} in Barangay ${formData.barangay}.`,
-          submittedAt: fallbackRequest.submittedAt,
-          assignedDeptId: "mswdo",
-          status: "PENDING",
-          priority: "HIGH",
-          trackingNumber: generatedId,
-          attachments: fallbackRequest.attachments
-        });
-        localStorage.setItem('talibon_citizen_requests', JSON.stringify(list));
-      } catch (e) {
-        console.error("Failed to sync fallback requests to localStorage", e);
-      }
-
       onSuccess(fallbackRequest);
     } finally {
       setIsSubmitting(false);

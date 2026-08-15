@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Digital Talibon Core V4 — System Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+<style>
+  :root{
+    --bg-deep:#080B16;
+    --bg-panel:#0F1530;
+    --bg-panel-2:#141B3D;
+    --bg-raised:#171F45;
+    --line:#262F5C;
+    --line-soft:#1B2348;
+    --text:#EAEEFB;
+    --text-dim:#8D96C2;
+    --text-faint:#5D6690;
+    --teal:#3DDC97;
+    --teal-dim:#1E5C46;
+    --gold:#E3B341;
+    --gold-dim:#5C4A1E;
+    --red:#FF6161;
+    --accent: var(--teal);
+    --accent-dim: var(--teal-dim);
+    --font-display:'Space Grotesk', sans-serif;
+    --font-body:'Inter', sans-serif;
+    --font-mono:'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{background:var(--bg-deep); color:var(--text); font-family:var(--font-body); scroll-behavior:smooth;}
+  body{
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(61,220,151,0.05), transparent 40%),
+      radial-gradient(circle at 90% 10%, rgba(227,179,65,0.04), transparent 45%),
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size: auto, auto, 42px 42px, 42px 42px;
+    background-position: 0 0, 0 0, -1px -1px, -1px -1px;
+  }
+  ::selection{ background: var(--accent); color:#08110C; }
+  a{color:inherit;}
+
+  /* ===== Header / plaque ===== */
+  header.plaque{
+    position:sticky; top:0; z-index:50;
+    background: rgba(8,11,22,0.86);
+    backdrop-filter: blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .plaque-inner{
+    max-width:1400px; margin:0 auto; padding:18px 28px;
+    display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap;
+  }
+  .brand{ display:flex; align-items:center; gap:14px; }
+  .seal{
+    width:44px; height:44px; border-radius:10px;
+    border:1.5px solid var(--accent);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-display); font-weight:700; font-size:15px; color:var(--accent);
+    background: linear-gradient(160deg, var(--bg-raised), var(--bg-panel));
+    box-shadow: 0 0 0 4px rgba(61,220,151,0.06);
+    transition: all .4s ease;
+    position:relative;
+  }
+  .seal::after{
+    content:""; position:absolute; inset:-6px; border-radius:14px;
+    border:1px dashed rgba(61,220,151,0.25); transition: border-color .4s ease;
+  }
+  .brand-text .kicker{
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--text-faint);
+  }
+  .brand-text h1{
+    font-family:var(--font-display); font-size:19px; font-weight:600; letter-spacing:.01em; margin-top:2px;
+  }
+  .status-line{
+    display:flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+    margin-top:3px;
+  }
+  .dot{ width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent); animation:pulse 2.2s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+
+  .ledger{ display:flex; gap:22px; font-family:var(--font-mono); }
+  .ledger .stat{ text-align:right; }
+  .ledger .stat .v{ font-size:15px; font-weight:600; color:var(--accent); }
+  .ledger .stat .l{ font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-faint); margin-top:2px;}
+
+  /* ===== Tab toggle (signature element) ===== */
+  .toggle-wrap{ max-width:1400px; margin:0 auto; padding:0 28px 18px; }
+  .toggle{
+    display:inline-flex; border:1px solid var(--line); border-radius:999px; padding:4px;
+    background:var(--bg-panel); position:relative; gap:2px;
+  }
+  .toggle button{
+    appearance:none; border:none; background:transparent; color:var(--text-dim);
+    font-family:var(--font-mono); font-size:11.5px; letter-spacing:.1em; text-transform:uppercase;
+    padding:9px 20px; border-radius:999px; cursor:pointer; position:relative; z-index:2;
+    display:flex; align-items:center; gap:8px; transition: color .3s ease;
+  }
+  .toggle button .tdot{ width:5px; height:5px; border-radius:50%; background:currentColor; opacity:.6; }
+  .toggle button.active{ color:#08110C; }
+  .toggle .slider{
+    position:absolute; top:4px; bottom:4px; left:4px; width:calc(50% - 4px);
+    border-radius:999px; background:var(--accent); z-index:1;
+    transition: transform .35s cubic-bezier(.65,0,.35,1), background .35s ease;
+    box-shadow: 0 0 22px rgba(61,220,151,0.35);
+  }
+  body[data-tab="drp"] .toggle .slider{ transform: translateX(100%); background:var(--gold); box-shadow:0 0 22px rgba(227,179,65,0.35); }
+  body[data-tab="drp"] .seal{ border-color:var(--gold); color:var(--gold); box-shadow:0 0 0 4px rgba(227,179,65,0.06); }
+  body[data-tab="drp"] .seal::after{ border-color:rgba(227,179,65,0.25); }
+  body[data-tab="drp"] .dot{ background:var(--gold); box-shadow:0 0 8px var(--gold);}
+  body[data-tab="drp"] .ledger .stat .v{ color:var(--gold); }
+
+  /* ===== Layout ===== */
+  .shell{ max-width:1400px; margin:0 auto; padding:0 28px 80px; display:grid; grid-template-columns:250px 1fr; gap:32px; }
+  @media (max-width:900px){ .shell{ grid-template-columns:1fr; } nav.rail{ position:static !important; } }
+
+  nav.rail{ position:sticky; top:150px; align-self:start; max-height:calc(100vh - 170px); overflow-y:auto; padding-right:6px; }
+  nav.rail::-webkit-scrollbar{ width:4px; } nav.rail::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
+  nav.rail .rail-title{ font-family:var(--font-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--text-faint); margin-bottom:12px; padding-left:14px;}
+  nav.rail a{
+    display:flex; gap:10px; align-items:baseline; text-decoration:none;
+    font-size:12.5px; color:var(--text-dim); padding:7px 14px; border-left:2px solid transparent;
+    border-radius:0 6px 6px 0; transition: all .2s ease; line-height:1.35;
+  }
+  nav.rail a:hover{ color:var(--text); background:var(--bg-panel); }
+  nav.rail a .n{ font-family:var(--font-mono); color:var(--text-faint); font-size:11px; min-width:18px; }
+  nav.rail a.active{ color:var(--text); border-left-color:var(--accent); background:var(--bg-panel-2); }
+  nav.rail a.active .n{ color:var(--accent); }
+
+  main{ min-width:0; padding-top:34px; }
+  .tabpanel{ display:none; }
+  .tabpanel.active{ display:block; }
+
+  .intro-card{
+    border:1px solid var(--line); background:linear-gradient(160deg, var(--bg-panel), var(--bg-deep));
+    border-radius:14px; padding:26px 28px; margin-bottom:38px;
+  }
+  .intro-card h2{ font-family:var(--font-display); font-size:24px; margin-bottom:10px; }
+  .intro-card p{ color:var(--text-dim); font-size:14px; line-height:1.65; max-width:74ch; }
+  .intro-tags{ display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+  .tag{ font-family:var(--font-mono); font-size:10.5px; padding:5px 10px; border:1px solid var(--line); border-radius:6px; color:var(--text-dim); }
+
+  section.block{ margin-bottom:56px; scroll-margin-top:150px; }
+  .block-head{ display:flex; align-items:baseline; gap:12px; margin-bottom:16px; }
+  .block-head .num{ font-family:var(--font-mono); font-size:13px; color:var(--accent); border:1px solid var(--accent-dim); padding:2px 8px; border-radius:6px; }
+  .block-head h3{ font-family:var(--font-display); font-size:20px; font-weight:600; }
+  .block-intro{ color:var(--text-dim); font-size:13.5px; margin-bottom:18px; max-width:76ch; line-height:1.6; }
+
+  .card{ border:1px solid var(--line); background:var(--bg-panel); border-radius:12px; padding:20px 22px; margin-bottom:16px; }
+  .card + .card{ margin-top:16px; }
+  .diagram-card{ overflow-x:auto; }
+  .diagram-card .mermaid{ display:flex; justify-content:center; min-width:520px; }
+
+  .note{
+    display:flex; gap:10px; align-items:flex-start; border:1px dashed var(--line);
+    border-left:3px solid var(--accent); background:var(--bg-panel-2); border-radius:0 10px 10px 0;
+    padding:12px 16px; font-size:12.5px; color:var(--text-dim); margin-top:4px;
+  }
+  .note b{ color:var(--text); }
+  body[data-tab="drp"] .note{ border-left-color:var(--gold); }
+
+  /* tables */
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th,td{ text-align:left; padding:10px 14px; border-bottom:1px solid var(--line-soft); }
+  th{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-faint); border-bottom:1px solid var(--line); }
+  td{ color:var(--text-dim); }
+  tr:hover td{ color:var(--text); background:rgba(255,255,255,0.01); }
+  td:first-child, th:first-child{ color:var(--text); font-weight:500; }
+
+  /* tree / pre */
+  pre.tree{ font-family:var(--font-mono); font-size:12px; line-height:1.75; color:var(--text-dim); overflow-x:auto; white-space:pre; }
+  pre.tree .hl{ color:var(--accent); }
+
+  /* checklist */
+  ul.checklist{ list-style:none; display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:8px 20px; }
+  ul.checklist li{ display:flex; gap:9px; align-items:flex-start; font-size:12.5px; color:var(--text-dim); padding:3px 0; }
+  ul.checklist li::before{
+    content:""; width:13px; height:13px; margin-top:2px; flex:0 0 13px; border-radius:4px;
+    border:1.5px solid var(--accent-dim); background:var(--bg-raised);
+  }
+  body[data-tab="drp"] ul.checklist li::before{ border-color:var(--gold-dim); }
+
+  /* chips */
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{ font-family:var(--font-mono); font-size:11.5px; padding:6px 12px; border-radius:999px; border:1px solid var(--line); color:var(--text); background:var(--bg-raised); }
+
+  /* description list */
+  .dlist{ display:grid; gap:14px; }
+  .ditem{ display:grid; grid-template-columns:150px 1fr; gap:16px; }
+  .ditem .dt{ font-family:var(--font-mono); font-size:12px; color:var(--accent); padding-top:1px; }
+  body[data-tab="drp"] .ditem .dt{ color:var(--gold); }
+  .ditem .dd{ font-size:13px; color:var(--text-dim); line-height:1.55; }
+  @media (max-width:640px){ .ditem{ grid-template-columns:1fr; } }
+
+  /* steps chain */
+  .chain{ display:flex; flex-wrap:wrap; align-items:center; gap:0; font-family:var(--font-mono); font-size:12px; }
+  .chain .step{ padding:9px 14px; border:1px solid var(--line); border-radius:8px; background:var(--bg-raised); color:var(--text); }
+  .chain .arrow{ color:var(--accent); padding:0 10px; font-size:14px; }
+  body[data-tab="drp"] .chain .arrow{ color:var(--gold); }
+
+  /* numbered ordered rules */
+  ol.rules{ list-style:none; counter-reset:rule; display:grid; gap:10px; }
+  ol.rules li{ counter-increment:rule; display:flex; gap:14px; font-size:13px; color:var(--text-dim); align-items:baseline; }
+  ol.rules li::before{
+    content: counter(rule, decimal-leading-zero); font-family:var(--font-mono); font-size:11px; color:var(--accent);
+    border:1px solid var(--accent-dim); border-radius:5px; padding:2px 6px; flex:0 0 auto;
+  }
+  body[data-tab="drp"] ol.rules li::before{ color:var(--gold); border-color:var(--gold-dim); }
+
+  /* severity table pills */
+  .pill{ font-family:var(--font-mono); font-size:11px; padding:4px 10px; border-radius:6px; display:inline-block; }
+  .pill.sev1{ background:rgba(255,97,97,.12); color:var(--red); border:1px solid rgba(255,97,97,.35); }
+  .pill.sev2{ background:rgba(227,179,65,.12); color:var(--gold); border:1px solid rgba(227,179,65,.35); }
+  .pill.sev3{ background:rgba(61,220,151,.1); color:var(--teal); border:1px solid rgba(61,220,151,.3); }
+  .pill.sev4{ background:rgba(141,150,194,.1); color:var(--text-dim); border:1px solid var(--line); }
+
+  /* quote / final standard */
+  .quote{ border-left:3px solid var(--gold); padding:18px 22px; background:var(--bg-panel-2); border-radius:0 12px 12px 0; }
+  .quote .lead{ font-family:var(--font-display); font-size:16px; color:var(--text-faint); text-decoration:line-through; margin-bottom:10px; }
+  .quote .goal{ font-size:15px; color:var(--text); line-height:1.7; }
+
+  .env-cards{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:700px){ .env-cards{ grid-template-columns:1fr; } }
+  .env-card{ border-radius:10px; padding:16px 18px; font-family:var(--font-mono); font-size:12px; }
+  .env-card.pub{ border:1px solid var(--teal-dim); background:rgba(61,220,151,0.05); }
+  .env-card.priv{ border:1px solid rgba(255,97,97,.3); background:rgba(255,97,97,0.05); }
+  .env-card .lab{ letter-spacing:.1em; text-transform:uppercase; font-size:10px; margin-bottom:8px; }
+  .env-card.pub .lab{ color:var(--teal); } .env-card.priv .lab{ color:var(--red); }
+  .env-card code{ display:block; color:var(--text-dim); line-height:1.8; }
+
+  footer{ max-width:1400px; margin:0 auto; padding:30px 28px 60px; border-top:1px solid var(--line); }
+  footer p{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); text-align:center; }
+</style>
+</head>
+<body data-tab="workflow">
+
+<header class="plaque">
+  <div class="plaque-inner">
+    <div class="brand">
+      <div class="seal">DT</div>
+      <div class="brand-text">
+        <div class="kicker">Municipal Digital Systems / LGU Talibon</div>
+        <h1>Digital Talibon Core V4</h1>
+        <div class="status-line"><span class="dot"></span><span id="statusText">Live schema · V4 canonical source</span></div>
+      </div>
+    </div>
+    <div class="ledger">
+      <div class="stat"><div class="v">RPO ≤ 24h</div><div class="l">Recovery Point</div></div>
+      <div class="stat"><div class="v">RTO ≤ 8h</div><div class="l">Recovery Time</div></div>
+      <div class="stat"><div class="v" id="layerCount">5</div><div class="l">System Layers</div></div>
+    </div>
+  </div>
+  <div class="toggle-wrap">
+    <div class="toggle">
+      <div class="slider"></div>
+      <button class="active" data-tab="workflow"><span class="tdot"></span>Operations · Workflow</button>
+      <button data-tab="drp"><span class="tdot"></span>Recovery · DRP</button>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="rail" id="rail"></nav>
+  <main>
+    <div class="tabpanel active" id="panel-workflow">
+      <div class="intro-card">
+        <h2>System Architecture &amp; Operational Workflow</h2>
+        <p>How Digital Talibon Core V4 is built, deployed, and run day to day — from browser to database, across five layered responsibilities: presentation, edge security, backend logic, Supabase data services, and backup.</p>
+        <div class="intro-tags">
+          <span class="tag">React · Vite · TS</span><span class="tag">NestJS on Cloud Run</span><span class="tag">Supabase Postgres</span><span class="tag">Cloudflare Edge</span><span class="tag">GitHub CI/CD</span>
+        </div>
+      </div>
+      <div id="workflow-sections"></div>
+    </div>
+
+    <div class="tabpanel" id="panel-drp">
+      <div class="intro-card">
+        <h2>Disaster Recovery Plan</h2>
+        <p>A separate, standalone recovery discipline. If the database, storage, repository, DNS, or a credential is destroyed or compromised, this is the path back to a verified production system — without relying on undocumented knowledge or a single point of failure.</p>
+        <div class="intro-tags">
+          <span class="tag">RPO ≤ 24h</span><span class="tag">RTO ≤ 8h</span><span class="tag">Independent backups</span><span class="tag">Tested restores only</span>
+        </div>
+      </div>
+      <div id="drp-sections"></div>
+    </div>
+  </main>
+</div>
+
+<footer>
+  <p>Digital Talibon Core V4 — Internal architecture reference. Never commit real API keys, passwords, tokens, service-role credentials, or private keys to this or any document.</p>
+</footer>
+
+<script>
+mermaid.initialize({ startOnLoad:false, securityLevel:'loose', fontFamily:'JetBrains Mono, monospace' });
+
+function mmd(code, accent){
+  const init = `%%{init: {'theme':'base','themeVariables':{'primaryColor':'#171F45','primaryTextColor':'#EAEEFB','primaryBorderColor':'${accent}','lineColor':'${accent}','secondaryColor':'#141B3D','tertiaryColor':'#0F1530','tertiaryBorderColor':'${accent}','clusterBkg':'#0F1530','clusterBorder':'#262F5C','edgeLabelBackground':'#0F1530','fontFamily':'JetBrains Mono, monospace','fontSize':'13px','actorBkg':'#171F45','actorBorder':'${accent}','actorTextColor':'#EAEEFB','signalColor':'${accent}','signalTextColor':'#EAEEFB','labelBoxBkgColor':'#171F45','labelBoxBorderColor':'${accent}','loopTextColor':'#8D96C2','noteBkgColor':'#141B3D','noteBorderColor':'${accent}','noteTextColor':'#EAEEFB'}}}%%\n`;
+  return init + code;
+}
+
+/* ---------- content renderers ---------- */
+function elDiagram(code, accent){ return `<div class="card diagram-card"><div class="mermaid">${mmd(code, accent)}</div></div>`; }
+function elNote(html){ return `<div class="note">${html}</div>`; }
+function elTable(headers, rows){
+  return `<div class="card"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+  <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function elTree(text){ return `<div class="card"><pre class="tree">${text}</pre></div>`; }
+function elChecklist(items){ return `<div class="card"><ul class="checklist">${items.map(i=>`<li>${i}</li>`).join('')}</ul></div>`; }
+function elChips(items){ return `<div class="card"><div class="chips">${items.map(i=>`<span class="chip">${i}</span>`).join('')}</div></div>`; }
+function elDlist(items){ return `<div class="card"><div class="dlist">${items.map(i=>`<div class="ditem"><div class="dt">${i[0]}</div><div class="dd">${i[1]}</div></div>`).join('')}</div></div>`; }
+function elChain(steps){ return `<div class="card"><div class="chain">${steps.map((s,i)=>(i? `<span class="arrow">→</span>`:'')+`<span class="step">${s}</span>`).join('')}</div></div>`; }
+function elRules(items){ return `<div class="card"><ol class="rules">${items.map(i=>`<li>${i}</li>`).join('')}</ol></div>`; }
+function elQuote(lead, goal){ return `<div class="quote"><div class="lead">${lead}</div><div class="goal">${goal}</div></div>`; }
+function elEnvCards(pubVars, privVars){
+  return `<div class="env-cards">
+    <div class="env-card pub"><div class="lab">Browser · public</div><code>${pubVars.join('<br>')}</code></div>
+    <div class="env-card priv"><div class="lab">Server only</div><code>${privVars.join('<br>')}</code></div>
+  </div>`;
+}
+function elSeverityTable(){
+  return `<div class="card"><table><thead><tr><th>Level</th><th>Example</th><th>Response</th></tr></thead><tbody>
+  <tr><td><span class="pill sev1">SEV-1</span></td><td>Database destruction, credential compromise, major citizen-data incident</td><td>Immediate response</td></tr>
+  <tr><td><span class="pill sev2">SEV-2</span></td><td>Backend unavailable, major CMS outage</td><td>Rapid restoration</td></tr>
+  <tr><td><span class="pill sev3">SEV-3</span></td><td>Non-critical module failure</td><td>Normal priority</td></tr>
+  <tr><td><span class="pill sev4">SEV-4</span></td><td>Cosmetic / UI issue</td><td>Scheduled fix</td></tr>
+  </tbody></table></div>`;
+}
+
+function block(num, title, intro, bodyHtml, id){
+  return `<section class="block" id="${id}">
+    <div class="block-head"><span class="num">${num}</span><h3>${title}</h3></div>
+    ${intro? `<p class="block-intro">${intro}</p>`:''}
+    ${bodyHtml}
+  </section>`;
+}
+
+/* =========================================================
+   WORKFLOW TAB CONTENT
+   ========================================================= */
+const TEAL = '#3DDC97';
+const workflowBlocks = [];
+
+workflowBlocks.push(block('01','Executive Architecture',
+ 'Five layered responsibilities carry a request from a citizen\'s browser down to the canonical database and back out to backup.',
+ elDiagram(`flowchart TD
+    U[Citizens / Admins] --> CF[Cloudflare Edge<br/>DNS / TLS / WAF / Rate Limits]
+    CF --> V[Vercel<br/>React/Vite Frontend]
+    CF --> C[Google Cloud Run<br/>NestJS Backend API]
+    V -->|HTTPS / Supabase JS| S[Supabase V4]
+    C -->|Server-side HTTPS| S
+    S --> DB[(PostgreSQL)]
+    S --> A[Supabase Auth]
+    S --> ST[Supabase Storage]
+    GH[GitHub] --> CI[CI/CD]
+    CI --> V
+    CI --> C
+    DB --> B[Independent Database Backups]
+    ST --> SB[Independent Storage Backups]`, TEAL)
+ + elChips(['1 · Browser presentation','2 · Edge / security','3 · Backend / business logic','4 · Supabase data, auth, storage','5 · Backup / disaster recovery'])
+ + elNote('<b>The live V4 database is the canonical data source.</b>'),
+ 'wf-01'));
+
+workflowBlocks.push(block('02','Technology Stack', null,
+ elTable(['Layer','Technology','Purpose'], [
+   ['UI','React','Component-based web application'],
+   ['Language','TypeScript','Type safety'],
+   ['Build','Vite','Development and production bundling'],
+   ['Styling','Tailwind CSS','UI styling'],
+   ['Routing','React Router','Public / protected navigation'],
+   ['Backend','NestJS / Node.js','API and business logic'],
+   ['Database','Supabase PostgreSQL','Canonical production database'],
+   ['Auth','Supabase Auth','Login / session management'],
+   ['Storage','Supabase Storage','CMS / media / document storage'],
+   ['API','Supabase REST/RPC + backend API','Data communication'],
+   ['Source Control','Git / GitHub','Version control and collaboration'],
+   ['Frontend Hosting','Vercel','Production frontend'],
+   ['Backend Hosting','Google Cloud Run','Production API'],
+   ['Edge','Cloudflare','DNS / TLS / WAF / rate limiting'],
+   ['CI/CD','GitHub-triggered deployment','Automated build / test / deploy'],
+   ['Security','RLS + RBAC + validation + rate limits','Access control'],
+   ['Recovery','DB + storage backups + migrations','Disaster recovery'],
+ ]), 'wf-02'));
+
+workflowBlocks.push(block('03','Repository Architecture', 'Recommended logical structure. Secrets never enter version control.',
+ elTree(`project/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   ├── services/
+│   ├── contexts/
+│   ├── hooks/
+│   ├── lib/
+│   │   └── <span class="hl">supabase.ts</span>
+│   ├── server/
+│   │   └── api/
+│   └── types/
+│
+├── supabase/
+│   ├── migrations/
+│   └── seed/
+│
+├── disaster-recovery/
+│   ├── README.md
+│   ├── RECOVERY_RUNBOOK.md
+│   ├── DATABASE_RECOVERY.md
+│   ├── STORAGE_RECOVERY.md
+│   ├── ENVIRONMENT_RECOVERY.md
+│   └── DEPLOYMENT_RECOVERY.md
+│
+├── .env.example
+├── package.json
+└── README.md`)
+ + elNote('Never commit <b>.env</b>, service-role keys, private keys, passwords, or production tokens.'),
+ 'wf-03'));
+
+workflowBlocks.push(block('04','Frontend Workflow', 'The frontend owns rendering, navigation, and client-side state — never server authority.',
+ elDiagram(`flowchart LR
+    Browser[Browser] --> Router[React Router]
+    Router --> Public[Public Pages]
+    Router --> Guard[Auth / Role Guard]
+    Guard --> Admin[Admin Dashboard]
+    Public --> Services[Frontend Services]
+    Admin --> Services
+    Services --> Supa[src/lib/supabase.ts]
+    Services --> API[Backend API]
+    Supa --> Supabase[Supabase]
+    API --> Backend[Cloud Run]`, TEAL)
+ + elChips(['UI rendering','Client-side validation','Navigation','Auth state','Loading / error / empty states','Public data display','Calling the backend'])
+ + elNote('The frontend must <b>not</b> contain service-role credentials.'),
+ 'wf-04'));
+
+workflowBlocks.push(block('05','Browser Client &amp; Environment Boundary', 'One canonical Supabase client lives at src/lib/supabase.ts. What the browser may know is strictly smaller than what the server knows.',
+ elEnvCards(['VITE_SUPABASE_URL=','VITE_SUPABASE_ANON_KEY='], ['SUPABASE_URL=','SUPABASE_SERVICE_ROLE_KEY=','(Cloud Run / server environments only)'])
+ + elDiagram(`flowchart TD
+    Env[Environment Configuration] --> Browser[Browser]
+    Env --> Server[Server]
+    Browser --> Public["VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY"]
+    Server --> Private["SUPABASE_SERVICE_ROLE_KEY
+Private API secrets"]`, TEAL)
+ + elRules(['.env* is gitignored','.env.example contains names only','Service-role credentials are server-only','Production secrets live in deployment / secret-management systems','Production bundles are scanned for secret leakage']),
+ 'wf-05'));
+
+workflowBlocks.push(block('06','Frontend ↔ Backend Communication', 'Two distinct paths: direct-to-Supabase for public CMS data, and Cloud Run mediation for anything requiring server-side authority.',
+ '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Public data</b></div>'
+ + elDiagram(`sequenceDiagram
+    participant U as Citizen
+    participant V as Vercel Frontend
+    participant S as Supabase
+    participant DB as PostgreSQL
+    U->>V: Open public page
+    V->>S: SELECT public records
+    S->>DB: Query
+    DB-->>S: Rows
+    S-->>V: JSON data
+    V-->>U: Render page`, TEAL)
+ + elChips(['Published news','Events','Departments','Barangays','Officials','Municipal services','Public tourism info'])
+ + '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Protected operations</b></div>'
+ + elDiagram(`sequenceDiagram
+    participant A as Admin/Citizen
+    participant V as Frontend
+    participant C as Cloud Run API
+    participant S as Supabase
+    participant DB as PostgreSQL
+    A->>V: Submit operation
+    V->>C: HTTPS + authenticated request
+    C->>C: Validate token
+    C->>C: Validate input
+    C->>C: Check authorization/role
+    C->>S: Server-side database operation
+    S->>DB: Query/Mutation
+    DB-->>S: Result
+    S-->>C: Result
+    C-->>V: Safe response
+    V-->>A: Result UI`, TEAL)
+ + elNote('RLS determines whether anonymous / public access is allowed.'),
+ 'wf-06'));
+
+workflowBlocks.push(block('07','Authentication Workflow', null,
+ elDiagram(`sequenceDiagram
+    participant U as User
+    participant V as React
+    participant A as Supabase Auth
+    participant C as Auth Context
+    participant R as Protected Route
+    U->>V: Email/password
+    V->>A: signInWithPassword()
+    A-->>C: Session/JWT state
+    C->>C: Resolve role
+    C-->>R: Authenticated + role
+    R-->>U: Authorized page`, TEAL)
+ + elNote('<b>Authentication is not authorization.</b> Authorization must still verify the user\'s role and database permissions.'),
+ 'wf-07'));
+
+workflowBlocks.push(block('08','Municipal Services Workflow', 'A data-driven CMS-to-public pipeline: what admins create becomes what citizens see, through one shared query path.',
+ elDiagram(`flowchart LR
+    Admin[Admin] --> CMS[Dashboard CMS]
+    CMS -->|CREATE / UPDATE| DB[(municipal_services)]
+    DB -->|Public SELECT| API[Public Service Query]
+    API --> Site[Public Services Page]
+    Site --> Citizen[Citizen]`, TEAL)
+ + elTree(`municipal_services
+    │
+    ├── deleted_at IS NULL
+    ├── active/published condition
+    ├── department relationship
+    └── stable ID/slug`)
+ + elNote('If the service inserts successfully but the public page says <b>SERVICE NOT FOUND</b>, inspect: ID/slug mapping → public query filters → deleted_at → published/active flags → route parameter → frontend service lookup → RLS policy → relationship joins → environment/database project mismatch.'),
+ 'wf-08'));
+
+workflowBlocks.push(block('09','E-Service Tracking Workflow', null,
+ elDiagram(`flowchart TD
+    Citizen[Citizen] --> Form[E-Service Form]
+    Form --> Req[service_requests]
+    Req --> Hist[service_request_history / workflow_history]
+    Admin[Admin] --> Workflow[Admin Workflow]
+    Workflow --> Hist
+    Hist --> Track[Tracking Lookup]
+    Track --> CitizenPortal[Citizen Tracking Page]`, TEAL)
+ + elChips(['UUID','ticket_id','tracking_code'])
+ + elNote('The public tracking response should never expose internal SQL/database errors.'),
+ 'wf-09'));
+
+workflowBlocks.push(block('10','CMS Workflow', 'Nine content modules share one CRUD-to-render pipeline.',
+ elChain(['Admin Login','Supabase Auth','Role Resolution','Admin Dashboard','CRUD Module','Input Validation','DB Transaction','Optional Audit Log','Public/Protected Rendering'])
+ + elChips(['Officials','Departments','Barangays','Municipal Services','Citizen Charters','News','Events','Downloads'])
+ + elNote('Audit logging should be non-blocking where the log itself is non-critical. A failed audit-log insert should not silently roll back a successful primary transaction unless policy explicitly requires transactional audit logging.'),
+ 'wf-10'));
+
+workflowBlocks.push(block('11','Routing Workflow', null,
+ elDiagram(`flowchart TD
+    URL[Browser URL] --> Router[React Router]
+    Router --> Public[Public Route]
+    Router --> Protected[Protected Route]
+    Router --> Unknown[Unknown Route]
+    Protected --> Auth{Authorized?}
+    Auth -->|Yes| Dashboard[Dashboard]
+    Auth -->|No| Denied[Access Denied]
+    Unknown --> NotFound[404 Not Found]`, TEAL)
+ + elChips(['NotFound','AccessDenied','Loading state','Error state','Retry state']),
+ 'wf-11'));
+
+workflowBlocks.push(block('12','Storage Workflow', null,
+ elDiagram(`flowchart LR
+    User[Authorized User] --> Upload[File Upload Component]
+    Upload --> Validate[MIME + Size + Filename Validation]
+    Validate --> Bucket[Supabase Storage]
+    Bucket --> DB[(Database Metadata)]
+    Public[Public Page] --> Bucket`, TEAL)
+ + elChips(['public-cms','media','avatars','documents','certificates'])
+ + elNote('Public media and private citizen/certificate documents must have <b>different</b> access policies.'),
+ 'wf-12'));
+
+workflowBlocks.push(block('13','Cloudflare Architecture &amp; Tunnel', 'Cloudflare is an edge/security layer. It never replaces RLS, RBAC, or authentication — and a tunnel is opt-in, not default.',
+ elDiagram(`flowchart LR
+    User[Internet] --> CF[Cloudflare]
+    CF --> V[Vercel]
+    CF --> C[Cloud Run]
+    V --> S[Supabase]
+    C --> S`, TEAL)
+ + elChips(['DNS','TLS','WAF','DDoS protection','Rate limiting','Security rules','Edge routing'])
+ + elNote('Cloudflare does <b>not</b> replace: Supabase RLS · Authentication · RBAC · Backend authorization · Secure env vars · Backups.')
+ + '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Tunnel — only for a real private-origin requirement</b></div>'
+ + elDiagram(`flowchart LR
+    Admin[Authorized Admin] --> Access[Cloudflare Access]
+    Access --> Tunnel[Cloudflare Tunnel]
+    Tunnel --> Private[Private Origin]`, TEAL)
+ + elNote('Do not add a tunnel solely for the appearance of security — it introduces another operational dependency. Normal Cloud Run traffic is just Vercel/Cloudflare → HTTPS → Cloud Run.'),
+ 'wf-13'));
+
+workflowBlocks.push(block('14','Git Workflow', null,
+ elDiagram(`flowchart LR
+    Dev[Developer] --> Branch[feature/*]
+    Branch --> Test[Local Tests]
+    Test --> Push[git push]
+    Push --> PR[Pull Request]
+    PR --> CI[CI Checks]
+    CI --> Review[Review]
+    Review --> Main[main]
+    Main --> Deploy[Production Deployment]`, TEAL)
+ + elTree(`$ npm run lint
+$ npx tsc --noEmit
+$ npm run build`)
+ + elNote('Never force-push <b>main</b> during normal development.'),
+ 'wf-14'));
+
+workflowBlocks.push(block('15','CI/CD Pipeline', null,
+ elDiagram(`flowchart TD
+    Push[Push / Pull Request] --> Install[Install Dependencies]
+    Install --> Type[TypeScript Check]
+    Type --> Lint[Lint]
+    Lint --> Test[Tests]
+    Test --> Build[Production Build]
+    Build --> Secret[Secret Scan]
+    Secret --> Security[Dependency/Security Scan]
+    Security --> Pass{All Pass?}
+    Pass -->|No| Stop[Stop]
+    Pass -->|Yes| Merge[Merge]
+    Merge --> FE[Vercel Deployment]
+    Merge --> BE[Cloud Run Deployment]
+    FE --> Smoke[Production Smoke Test]
+    BE --> Smoke`, TEAL)
+ + elChecklist(['TypeScript: PASS','Lint: PASS','Build: PASS','Secret scan: PASS','Security checks: PASS']),
+ 'wf-15'));
+
+workflowBlocks.push(block('16','Deployment — Frontend &amp; Backend', null,
+ '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Frontend → Vercel</b></div>'
+ + elChain(['GitHub main','Install','Build','Inject env vars','Deploy','Production URL'])
+ + elNote('Do not put server-only variables into Vercel\'s browser-facing environment.')
+ + '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Backend → Cloud Run</b></div>'
+ + elChain(['GitHub','CI','Docker build','Container Registry','Cloud Run revision','Env/secrets','Health check','Production'])
+ + elNote('Server secrets should preferably be managed through a proper secret-management system such as Google Cloud Secret Manager.'),
+ 'wf-16'));
+
+workflowBlocks.push(block('17','Database Migration Workflow', 'Database changes are version-controlled, never undocumented production edits.',
+ elTree(`supabase/migrations/
+├── 001_initial.sql
+├── 002_auth.sql
+├── 003_cms.sql
+├── 004_services.sql
+├── 005_workflow.sql
+├── 006_rls.sql
+└── ...`)
+ + elDiagram(`flowchart LR
+    Change[Schema Change] --> Migration[Migration File]
+    Migration --> Test[Test Environment]
+    Test --> Backup[Production Backup]
+    Backup --> Deploy[Production Migration]
+    Deploy --> Verify[Schema + Smoke Test]`, TEAL)
+ + elNote('Do not make undocumented production schema edits.'),
+ 'wf-17'));
+
+workflowBlocks.push(block('18','Security Hardening Workflow', null,
+ elDiagram(`flowchart TD
+    Input[User Input] --> Validate[Validation]
+    Validate --> Sanitize[Sanitization]
+    Sanitize --> Auth[Authentication]
+    Auth --> RBAC[Authorization/RBAC]
+    RBAC --> RLS[RLS]
+    RLS --> DB[(Database)]
+    Input --> Rate[Rate Limiting]
+    Rate --> API[API]
+    API --> DB`, TEAL)
+ + elChips(['Authentication','RBAC','RLS','Input validation','Rich-text sanitization','File restrictions','Rate limiting','Error masking','Secret separation','Security headers','Dependency scanning','Audit logging','Backup/recovery']),
+ 'wf-18'));
+
+workflowBlocks.push(block('19','Production Smoke Test', 'Run after every production deployment.',
+ elChecklist(['Homepage','Public routing','News','Events','Municipal services','Departments','Barangays','Officials','Service detail pages','E-Service submission','Tracking','Admin login','RBAC','CMS CRUD','File upload','Storage','API health','Database connectivity','Error handling']),
+ 'wf-19'));
+
+workflowBlocks.push(block('20','Production Release Gate', null,
+ elChecklist(['TypeScript PASS','Lint PASS','Build PASS','Tests PASS','Secret scan PASS','Environment configured','Database migration verified','RLS verified','Authentication verified','Storage verified','Public pages verified','CMS verified','E-Service verified','Tracking verified','Backup verified','Recovery documentation updated','Rollback/recovery path available']),
+ 'wf-20'));
+
+workflowBlocks.push(block('21','Operational Rules', null,
+ elRules([
+  'Supabase PostgreSQL is the canonical production database.',
+  'The live V4 schema is the source of truth.',
+  'Use one canonical browser Supabase client.',
+  'Service-role credentials remain server-only.',
+  'RLS remains enabled on protected tables.',
+  'Frontend authorization must never be the only authorization boundary.',
+  'Do not commit secrets.',
+  'Keep at least one independent backup copy.',
+  'Test restoration, not just backup creation.',
+  'Version-control database migrations.',
+  'Back up storage separately from database data.',
+  'Run smoke tests after deployment.',
+  'Treat citizen data as sensitive.',
+  'Keep production errors safe and non-revealing.',
+  'Cloudflare is an edge/security layer, not a replacement for RLS or RBAC.',
+  'Use Cloudflare Tunnel only where it solves a real private-origin requirement.',
+  'Maintain a written recovery runbook.',
+  'Perform periodic disaster recovery drills.',
+ ]), 'wf-21'));
+
+document.getElementById('workflow-sections').innerHTML = workflowBlocks.join('');
+
+/* =========================================================
+   DRP TAB CONTENT
+   ========================================================= */
+const GOLD = '#E3B341';
+const drpBlocks = [];
+
+drpBlocks.push(block('23','Objective &amp; Recovery Targets',
+ 'The DRP allows Digital Talibon Core V4 to be rebuilt after any of the following.',
+ elChips(['Database destruction','Accidental destructive migration','Storage deletion','Credential compromise','GitHub loss','Vercel failure','Cloud Run failure','DNS failure','Major application corruption','Malicious modification','Cloud infrastructure outage'])
+ + elDlist([['RPO','≤ 24 hours — maximum tolerable data loss window.'],['RTO','≤ 8 hours — maximum tolerable time to restore service.'],['Critical transactions','Improve RPO further where infrastructure and budget permit.']]),
+ 'drp-23'));
+
+drpBlocks.push(block('24','Backup Architecture', 'Never rely only on backups inside the same production failure domain.',
+ elDiagram(`flowchart TD
+    Prod[Production]
+    Prod --> DB[(Supabase PostgreSQL)]
+    Prod --> Storage[Supabase Storage]
+    DB --> DBB[Independent DB Backup]
+    Storage --> STB[Independent Storage Backup]
+    DBB --> Archive[Encrypted External Archive]
+    STB --> Archive`, GOLD)
+ + elChips(['Encrypted','Access-controlled','Versioned','Retained','Monitored','Periodically restored and tested']),
+ 'drp-24'));
+
+drpBlocks.push(block('25','Database Recovery', null,
+ elDiagram(`flowchart TD
+    Disaster[Database Disaster] --> Freeze[Stop Risky Changes]
+    Freeze --> Assess[Assess Damage]
+    Assess --> Point[Select Last Known-Good Backup]
+    Point --> Isolated[Create Recovery Database]
+    Isolated --> Schema[Apply Migrations / Schema]
+    Schema --> Data[Restore Data]
+    Data --> RLS[Verify RLS / Constraints / Indexes]
+    RLS --> App[Point Application to Recovery DB]
+    App --> Smoke[Smoke Test]
+    Smoke --> GoLive[Resume Service]`, GOLD)
+ + elNote('<b>Never overwrite the only surviving backup</b> during recovery.'),
+ 'drp-25'));
+
+drpBlocks.push(block('26','Storage Recovery', 'Database restoration does not automatically guarantee file restoration.',
+ elChain(['Storage backup','Restore bucket config','Restore objects','Validate object paths','Validate DB references','Test public/private permissions'])
+ + elChecklist(['CMS images','News media','Event media','Documents','Certificates','Avatars']),
+ 'drp-26'));
+
+drpBlocks.push(block('27','Credential Compromise Recovery', null,
+ elDiagram(`flowchart TD
+    Exposed[Secret Exposed] --> Identify[Identify Credential]
+    Identify --> Rotate[Rotate/Revoke]
+    Rotate --> Git[Inspect Git History]
+    Git --> Logs[Inspect CI/Deployment Logs]
+    Logs --> Activity[Review Suspicious Activity]
+    Activity --> Dep[Rotate Dependencies]
+    Dep --> Deploy[Redeploy]
+    Deploy --> Audit[Security Audit]
+    Audit --> Document[Incident Report]`, GOLD)
+ + elRules(['Rotate immediately','Review database activity','Review suspicious data changes','Verify RLS','Replace the backend secret','Redeploy','Run smoke/security tests','Document the incident'])
+ + elNote('Deleting the key from the newest commit is <b>not sufficient</b> if it remains in Git history.'),
+ 'drp-27'));
+
+drpBlocks.push(block('28','GitHub Recovery', null,
+ elChain(['Trusted local clone / mirror','Create replacement repo','Restore branches','Restore CI/CD','Reconnect Vercel','Reconnect Cloud Run','Configure secrets','Deploy'])
+ + elNote('Maintain at least one independent source recovery copy.'),
+ 'drp-28'));
+
+drpBlocks.push(block('29','Vercel Recovery', null,
+ elChain(['GitHub','Create replacement Vercel project','Connect repository','Configure build','Configure env vars','Deploy','Configure DNS','Smoke test']),
+ 'drp-29'));
+
+drpBlocks.push(block('30','Cloud Run Recovery', null,
+ elChain(['GitHub','Build Docker image','Container Registry','Create Cloud Run service','Configure env/secrets','Configure ingress/auth','Health check','Production']),
+ 'drp-30'));
+
+drpBlocks.push(block('31','DNS Recovery', 'Maintain this inventory outside the application repository.',
+ elChips(['Domain','DNS provider','Registrar','Cloudflare zone','Vercel records','Cloud Run/API records','TXT verification records','MX/email records'])
+ + elNote('Never store DNS account passwords in Git.'),
+ 'drp-31'));
+
+drpBlocks.push(block('32','Full Disaster Recovery Sequence', 'The end-to-end path from incident declaration to go-live.',
+ elDiagram(`flowchart TD
+    D[DISASTER] --> I[Declare Incident]
+    I --> F[Freeze Risky Changes]
+    F --> A[Assess Scope]
+    A --> DB[Restore Database]
+    A --> ST[Restore Storage]
+    DB --> BE[Restore Backend]
+    ST --> FE[Restore Frontend]
+    BE --> DNS[Restore DNS / Routing]
+    FE --> DNS
+    DNS --> SEC[Configure / Rotate Secrets]
+    SEC --> TEST[Security + Functional Tests]
+    TEST --> LIVE[GO LIVE]
+    LIVE --> REVIEW[Post-Incident Review]`, GOLD),
+ 'drp-32'));
+
+drpBlocks.push(block('33','Recovery Verification', 'Four checklists to clear before declaring the incident closed.',
+ '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Infrastructure</b></div>'
+ + elChecklist(['Frontend available','Backend available','Database available','Storage available','DNS resolves','HTTPS works'])
+ + '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Security</b></div>'
+ + elChecklist(['RLS enabled','Authentication works','RBAC works','Service-role key is server-only','Storage policies work','Rate limiting works','No secrets in frontend bundle'])
+ + '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Data</b></div>'
+ + elChecklist(['Departments','Barangays','Officials','Municipal services','News','Events','Service requests','Workflow history','Certificates','Audit logs'])
+ + '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Functions</b></div>'
+ + elChecklist(['Public website','CMS','Municipal service creation','Municipal service public rendering','E-Service submission','Ticket tracking','File upload']),
+ 'drp-33'));
+
+drpBlocks.push(block('34','Disaster Recovery Drill', 'A backup is validated only after a successful restoration test.',
+ elDiagram(`flowchart TD
+    Start[Recovery Drill] --> Env[Create Isolated Environment]
+    Env --> DB[Restore Database]
+    DB --> ST[Restore Storage]
+    ST --> BE[Deploy Backend]
+    BE --> FE[Deploy Frontend]
+    FE --> Test[Functional + Security Tests]
+    Test --> Time[Record RTO]
+    Time --> Fail[Record Failures]
+    Fail --> Improve[Update DRP]`, GOLD)
+ + elChips(['Restoration duration','Missing data','Failed migrations','Broken storage references','Broken DNS','Missing secrets','Failed permissions','Application errors']),
+ 'drp-34'));
+
+drpBlocks.push(block('35','Incident Severity', null, elSeverityTable(), 'drp-35'));
+
+drpBlocks.push(block('36','Rollback Strategy', null,
+ '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Application rollback</b></div>'
+ + elChain(['Failure','Identify last known-good release','Rollback frontend/backend','Smoke test'])
+ + '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Database rollback — handle carefully</b></div>'
+ + elChips(['Versioned migration','+ Backup','+ Forward-compatible changes','+ Recovery procedure'])
+ + elNote('Do not assume every migration can safely be reversed.'),
+ 'drp-36'));
+
+drpBlocks.push(block('37','Monitoring', null,
+ '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Frontend</b></div>'
+ + elChips(['Availability','Runtime errors','Failed deployments'])
+ + '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Backend</b></div>'
+ + elChips(['HTTP 4xx/5xx','Latency','Container health','CPU/memory','Restart frequency'])
+ + '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Database</b></div>'
+ + elChips(['Connection failures','Query errors','Storage growth','Backup status','RLS failures'])
+ + '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Security</b></div>'
+ + elChips(['Failed logins','Rate-limit events','Suspicious requests','Secret exposure','Unauthorized operations']),
+ 'drp-37'));
+
+drpBlocks.push(block('38','Zero-to-Production Recovery', 'The complete platform should be rebuildable from these seven inputs.',
+ elTree(`1. Git repository / independent source mirror
+2. Versioned database migrations
+3. Independent database backup
+4. Independent storage backup
+5. Environment-variable inventory
+6. Secret manager
+7. Deployment + DNS documentation`)
+ + elDiagram(`flowchart TD
+    Empty[Empty Infrastructure] --> Infra[Provision Infrastructure]
+    Infra --> Source[Restore Source]
+    Source --> Schema[Restore Schema]
+    Schema --> Data[Restore Data]
+    Data --> Storage[Restore Storage]
+    Storage --> Backend[Deploy Backend]
+    Backend --> Frontend[Deploy Frontend]
+    Frontend --> DNS[Configure DNS]
+    DNS --> Secrets[Configure Secrets]
+    Secrets --> Verify[Verify System]
+    Verify --> Online[Digital Talibon Core V4 ONLINE]`, GOLD),
+ 'drp-38'));
+
+drpBlocks.push(block('41','Implementation Roadmap', null,
+ '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--red);">P0 — Critical</b></div>'
+ + elChecklist(['Confirm independent database backup','Confirm independent storage backup','Confirm service-role key is server-only','Confirm production environment variables','Confirm RLS policies','Assign recovery ownership'])
+ + '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);">P1 — High</b></div>'
+ + elChecklist(['Version database migrations','Automate backup schedule','Create deployment manifest','Create recovery runbook','Add automated secret scanning','Add CI type/lint/build checks'])
+ + '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--teal);">P2 — Operational</b></div>'
+ + elChecklist(['Monitoring','Backend health endpoint','Automated smoke tests','DNS inventory','Cloudflare documentation','First full recovery drill'])
+ + '<div class="card"><b style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">P3 — Continuous</b></div>'
+ + elChecklist(['Quarterly recovery drill','Security review','Dependency audit','Backup restore test','RLS review','Admin/access review']),
+ 'drp-41'));
+
+drpBlocks.push(block('42','Final Standard', null,
+ elQuote('“Digital Talibon Core V4 is running.” — not the goal.',
+  'The operational goal is: Digital Talibon Core V4 can be securely developed, tested, deployed, monitored, recovered, and rebuilt after a major infrastructure failure — without relying on undocumented knowledge or a single point of failure.'),
+ 'drp-42'));
+
+document.getElementById('drp-sections').innerHTML = drpBlocks.join('');
+
+/* =========================================================
+   NAV RAIL + TAB SWITCHING
+   ========================================================= */
+function buildRail(tab){
+  const container = document.getElementById(tab==='workflow'? 'workflow-sections':'drp-sections');
+  const items = [...container.querySelectorAll('section.block')].map(s=>{
+    const num = s.querySelector('.num').textContent;
+    const title = s.querySelector('h3').textContent;
+    return `<a href="#${s.id}" data-target="${s.id}"><span class="n">${num}</span>${title}</a>`;
+  }).join('');
+  document.getElementById('rail').innerHTML = `<div class="rail-title">${tab==='workflow'?'Workflow index':'Recovery index'}</div>${items}`;
+}
+
+function setTab(tab){
+  document.body.setAttribute('data-tab', tab);
+  document.querySelectorAll('.toggle button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.getElementById('panel-workflow').classList.toggle('active', tab==='workflow');
+  document.getElementById('panel-drp').classList.toggle('active', tab==='drp');
+  document.getElementById('statusText').textContent = tab==='workflow' ? 'Live schema · V4 canonical source' : 'Recovery mode · verified restore path';
+  document.getElementById('layerCount').textContent = tab==='workflow' ? '5' : '7';
+  buildRail(tab);
+  window.scrollTo({top:0, behavior:'instant'});
+}
+
+document.querySelectorAll('.toggle button').forEach(b=>{
+  b.addEventListener('click', ()=> setTab(b.dataset.tab));
+});
+
+/* highlight active rail link on scroll */
+const observer = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      document.querySelectorAll('nav.rail a').forEach(a=>a.classList.toggle('active', a.dataset.target===e.target.id));
+    }
+  });
+}, { rootMargin:'-140px 0px -70% 0px' });
+
+async function init(){
+  await mermaid.run({ querySelector: '.mermaid' });
+  buildRail('workflow');
+  document.querySelectorAll('section.block').forEach(s=>observer.observe(s));
+}
+init();
+</script>
+</body>
+</html>

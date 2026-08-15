@@ -102,8 +102,11 @@ export default function Footer() {
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold text-brand-muted uppercase tracking-widest">Powered by</span>
-              <span className="text-[10px] font-extrabold text-brand-text uppercase">ALZA IT SOLUTIONS</span>
+              <span className="text-[10px] font-extrabold text-brand-text uppercase">Felji</span>
             </div>
+            <Link to="/privacy-policy" className="text-[10px] font-bold text-brand-muted hover:text-brand-primary uppercase tracking-widest transition-colors flex items-center gap-1.5">
+              Privacy Policy
+            </Link>
             <Link to="/login" className="text-[10px] font-bold text-brand-muted hover:text-brand-primary uppercase tracking-widest transition-colors flex items-center gap-2">
               <LogIn size={10} />
               Portal Access

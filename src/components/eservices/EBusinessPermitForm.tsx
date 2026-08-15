@@ -138,28 +138,6 @@ export default function EBusinessPermitForm({ onSuccess }: EBusinessPermitFormPr
       };
 
       saveLocalRequest(fallbackRequest);
-
-      // Add to local state of citizen requests
-      try {
-        const saved = localStorage.getItem('talibon_citizen_requests');
-        const list = saved ? JSON.parse(saved) : [];
-        list.unshift({
-          id: `req-${generatedId}`,
-          citizenName: formData.ownerName,
-          type: "Business Permit",
-          description: `Business Permit application submitted for ${formData.businessName} in Barangay ${formData.barangay}.`,
-          submittedAt: fallbackRequest.submittedAt,
-          assignedDeptId: "bplo",
-          status: "PENDING",
-          priority: "HIGH",
-          trackingNumber: generatedId,
-          attachments: fallbackRequest.attachments
-        });
-        localStorage.setItem('talibon_citizen_requests', JSON.stringify(list));
-      } catch (e) {
-        console.error("Failed to sync fallback requests to localStorage", e);
-      }
-
       onSuccess(fallbackRequest);
     } finally {
       setIsSubmitting(false);

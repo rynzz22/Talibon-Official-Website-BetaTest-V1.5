@@ -2,7 +2,6 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation, Link, Navigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
@@ -34,6 +33,7 @@ import NotFound from "./pages/NotFound";
 import TourismMapPage from "./pages/TourismMapPage";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancel from "./pages/PaymentCancel";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import Footer from "./components/Footer";
 import GeminiAssistant from "./components/GeminiAssistant";
 import ScrollToTop from "./components/ScrollToTop";
@@ -313,6 +313,7 @@ function AppLayout() {
           <Route path="/payment/cancel" element={<PaymentCancel />} />
           <Route path="/tourism/map" element={<TourismMapPage />} />
           <Route path="/news/updates" element={<UpdatesPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           
           {/* About Talibon */}
           <Route path="/about/profile" element={<ContentPage title="Brief Profile" fetchData={aboutApi.getProfile} renderContent={(data) => <ProfileView data={data} />} />} />
