@@ -195,6 +195,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (import.meta.env.DEV) {
           console.log(`[Auth - DEV] Registration Success for ${email}`);
         }
+        // Strict Security Compliance: Registration MUST NOT establish or persist an authenticated session.
+        // User account is created in pending state and requires administrator approval followed by explicit login.
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // ignore signout errors
+        }
+        setUser(null);
+        setSession(null);
+        setProfile(null);
+        setState("UNAUTHENTICATED");
       }
       return res;
     } catch (err: any) {

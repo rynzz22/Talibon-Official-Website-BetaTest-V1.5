@@ -17,7 +17,6 @@ const Hero: React.FC<HeroProps> = ({ overrideTitle, overrideSubtitle }) => {
   const { t, language } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
-
   const [isMuted, setIsMuted] = useState<boolean>(true);
   const userWantsAudioRef = useRef<boolean>(false);
   const isHeroInViewRef = useRef<boolean>(true);

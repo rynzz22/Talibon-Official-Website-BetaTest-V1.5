@@ -338,7 +338,29 @@ export const transparencyApi = {
   getCitizenCharter: () => api.get("content", API_ENDPOINTS.TRANSPARENCY.CITIZEN_CHARTER),
   getFullDisclosure: () => api.get("content", API_ENDPOINTS.TRANSPARENCY.FULL_DISCLOSURE),
   getInfrastructure: () => api.get("content", API_ENDPOINTS.TRANSPARENCY.INFRASTRUCTURE),
-  getFinanceReports: () => api.get("content", API_ENDPOINTS.TRANSPARENCY.FINANCE_REPORTS),
+  getFinanceReports: async () => {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from("transparency_documents")
+          .select("*")
+          .or("category.eq.reports,category.eq.finance,category.eq.disclosure,category.eq.budget")
+          .eq("status", "published")
+          .order("created_at", { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          return data.map((doc: any) => ({
+            id: doc.id,
+            title: doc.title,
+            url: doc.file_url || "#"
+          }));
+        }
+      } catch (err) {
+        console.warn("[transparencyApi] Live finance fetch failed, falling back:", err);
+      }
+    }
+    return api.get("content", API_ENDPOINTS.TRANSPARENCY.FINANCE_REPORTS);
+  },
   getExecutiveOrders: () => api.get("content", API_ENDPOINTS.TRANSPARENCY.EXECUTIVE_ORDERS),
   getBudget: () => api.get("content", API_ENDPOINTS.TRANSPARENCY.BUDGET),
   getBiddings: () => api.get("content", API_ENDPOINTS.TRANSPARENCY.BIDDINGS),

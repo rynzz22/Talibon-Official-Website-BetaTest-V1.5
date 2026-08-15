@@ -36,16 +36,42 @@ function setStorageDownloads(data: DownloadableItem[]): void {
   localStorage.setItem("cms_data:downloadables", JSON.stringify(data));
 }
 
+function mapDocumentToDownloadable(d: any): DownloadableItem {
+  return {
+    id: d.id,
+    title: d.title,
+    description: d.description || (d.department ? `Office: ${d.department}` : (d.category || '')),
+    category: d.category || 'forms',
+    file_url: d.file_url || '',
+    file_size: d.file_size || '1.2 MB',
+    status: d.status || 'published',
+    created_at: d.created_at
+  };
+}
+
 export const downloadablesService = {
   async getDownloadables(): Promise<DownloadableItem[]> {
     if (isSupabaseConfigured) {
       try {
+        // Query transparency_documents primary table
         const { data, error } = await supabase
-          .from("downloadables")
+          .from("transparency_documents")
           .select("*")
           .order("created_at", { ascending: false });
-        if (error) throw error;
-        if (data) return data as DownloadableItem[];
+
+        if (!error && data) {
+          return data.map(mapDocumentToDownloadable);
+        }
+
+        // Secondary fallback to downloadables view if transparency_documents query throws
+        if (error) {
+          const { data: viewData, error: viewError } = await supabase
+            .from("downloadables")
+            .select("*")
+            .order("created_at", { ascending: false });
+          if (viewError) throw viewError;
+          if (viewData) return viewData.map(mapDocumentToDownloadable);
+        }
       } catch (e: any) {
         if (!isMockAllowed()) {
           throw new Error(`[DownloadablesService] Failed to load downloadables: ${e.message}`);
@@ -63,15 +89,42 @@ export const downloadablesService = {
   async createDownloadable(item: Omit<DownloadableItem, "id">, userEmail: string): Promise<DownloadableItem> {
     if (isSupabaseConfigured) {
       try {
+        // Map payload strictly to matching columns of transparency_documents
+        const payload = {
+          title: item.title,
+          category: item.category || 'forms',
+          department: (item as any).department || null,
+          fiscal_year: (item as any).fiscal_year || new Date().getFullYear(),
+          quarter: (item as any).quarter || 'Q1',
+          file_url: item.file_url || null,
+          file_size: item.file_size || '1.2 MB',
+          status: item.status || 'published',
+          downloads_count: 0
+        };
+
         const { data, error } = await supabase
-          .from("downloadables")
-          .insert([item])
+          .from("transparency_documents")
+          .insert([payload])
           .select()
           .maybeSingle();
-        if (error) throw error;
+
+        if (error) {
+          // If direct table insert fails, attempt view insert
+          const { data: viewData, error: viewErr } = await supabase
+            .from("downloadables")
+            .insert([payload])
+            .select()
+            .maybeSingle();
+          if (viewErr) throw error;
+          if (viewData) {
+            await logCmsAction(userEmail, "CREATE", "downloadables", viewData.id);
+            return mapDocumentToDownloadable(viewData);
+          }
+        }
+
         if (data) {
           await logCmsAction(userEmail, "CREATE", "downloadables", data.id);
-          return data as DownloadableItem;
+          return mapDocumentToDownloadable(data);
         }
       } catch (e: any) {
         console.error("[DownloadablesService] Supabase Downloadables insert failed:", e.message || e);
@@ -95,16 +148,42 @@ export const downloadablesService = {
   async updateDownloadable(id: string, item: Partial<DownloadableItem>, userEmail: string): Promise<DownloadableItem> {
     if (isSupabaseConfigured) {
       try {
+        const updatePayload: any = {
+          updated_at: new Date().toISOString()
+        };
+        if (item.title !== undefined) updatePayload.title = item.title;
+        if (item.category !== undefined) updatePayload.category = item.category;
+        if ((item as any).department !== undefined) updatePayload.department = (item as any).department;
+        if ((item as any).fiscal_year !== undefined) updatePayload.fiscal_year = (item as any).fiscal_year;
+        if ((item as any).quarter !== undefined) updatePayload.quarter = (item as any).quarter;
+        if (item.file_url !== undefined) updatePayload.file_url = item.file_url;
+        if (item.file_size !== undefined) updatePayload.file_size = item.file_size;
+        if (item.status !== undefined) updatePayload.status = item.status;
+
         const { data, error } = await supabase
-          .from("downloadables")
-          .update(item)
+          .from("transparency_documents")
+          .update(updatePayload)
           .eq("id", id)
           .select()
           .maybeSingle();
-        if (error) throw error;
+
+        if (error) {
+          const { data: viewData, error: viewErr } = await supabase
+            .from("downloadables")
+            .update(updatePayload)
+            .eq("id", id)
+            .select()
+            .maybeSingle();
+          if (viewErr) throw error;
+          if (viewData) {
+            await logCmsAction(userEmail, "UPDATE", "downloadables", id);
+            return mapDocumentToDownloadable(viewData);
+          }
+        }
+
         if (data) {
           await logCmsAction(userEmail, "UPDATE", "downloadables", id);
-          return data as DownloadableItem;
+          return mapDocumentToDownloadable(data);
         }
       } catch (e: any) {
         console.error("[DownloadablesService] Supabase Downloadables update failed:", e.message || e);
@@ -131,10 +210,18 @@ export const downloadablesService = {
     if (isSupabaseConfigured) {
       try {
         const { error } = await supabase
-          .from("downloadables")
+          .from("transparency_documents")
           .delete()
           .eq("id", id);
-        if (error) throw error;
+
+        if (error) {
+          const { error: viewErr } = await supabase
+            .from("downloadables")
+            .delete()
+            .eq("id", id);
+          if (viewErr) throw error;
+        }
+
         await logCmsAction(userEmail, "DELETE", "downloadables", id);
         return true;
       } catch (e: any) {

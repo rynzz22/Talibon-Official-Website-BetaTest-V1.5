@@ -3227,7 +3227,7 @@ const AdminDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <FileUpload label="Secure File Attachment" folder="attachments" bucket="public-documents" currentValue={downloadForm.file_url} onUploadComplete={(url) => setDownloadForm({ ...downloadForm, file_url: url })} />
+                    <FileUpload label="Secure File Attachment" folder="attachments" bucket="public-cms" currentValue={downloadForm.file_url} onUploadComplete={(url) => setDownloadForm({ ...downloadForm, file_url: url })} />
 
                     <SubmitBtn label={editingId ? "Update library asset" : "Save library asset"} isLoading={isActionLoading} />
                   </form>

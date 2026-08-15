@@ -98,14 +98,18 @@ const Login: React.FC = () => {
         }
       } else if (data?.user) {
         const userProfile = await refreshProfile(data.user);
-        setSuccessMsg("Logged in successfully!");
-        if (rememberMe) {
-          localStorage.setItem("remember_me_email", email);
-        } else {
-          localStorage.removeItem("remember_me_email");
-        }
         if (userProfile && userProfile.is_verified) {
+          setSuccessMsg("Logged in successfully!");
+          if (rememberMe) {
+            localStorage.setItem("remember_me_email", email);
+          } else {
+            localStorage.removeItem("remember_me_email");
+          }
           navigate("/admin");
+        } else {
+          // Account exists but is still unverified/pending admin approval
+          await signOut();
+          setErrorMsg("Your account registration is pending administrator approval. Please wait for an administrator to approve your account before logging in.");
         }
       }
     } catch (err: any) {
@@ -135,7 +139,8 @@ const Login: React.FC = () => {
       if (error) {
         setErrorMsg(error.message);
       } else {
-        setSuccessMsg("Account created! A confirmation link has been sent to your email. Please confirm it before logging in. If you want to skip email confirmation, disable 'Confirm email' in your Supabase Dashboard (Auth -> Providers -> Email).");
+        setSuccessMsg("Account created successfully! Your registration is pending administrator approval. You will be able to log in with your credentials once approved.");
+        setView('login');
       }
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to register account.");
