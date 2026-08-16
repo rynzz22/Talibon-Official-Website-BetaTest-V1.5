@@ -36,10 +36,10 @@ export class EmailNotificationService {
     const resend = new ResendEmailProvider();
     if (resend.isConfigured()) {
       this.provider = resend;
-      this.logger.log(`[EmailNotification] Initialized with active provider: ${this.provider.name}`);
+      this.logger.log(`[EMAIL] Initialized with active provider: ${this.provider.name}`);
     } else {
       this.provider = new ConsoleEmailProvider();
-      this.logger.log(`[EmailNotification] No third-party email API key configured. Using: ${this.provider.name}`);
+      this.logger.log(`[EMAIL] No third-party email API key configured. Active provider: ${this.provider.name} (Console fallback)`);
     }
 
     // Periodically clean stale idempotency records (every 10 minutes)
@@ -199,15 +199,17 @@ export class EmailNotificationService {
 
     // 1. Validate recipient email
     if (!this.isValidEmail(recipientEmail)) {
-      this.logger.warn(`[EmailNotification] Skipped: Request ${ticketId} has no valid email (${this.maskEmail(recipientEmail)}).`);
+      this.logger.warn(`[EMAIL] Skipped notification for Ticket ${ticketId}: Recipient email is ${recipientEmail ? "INVALID (" + this.maskEmail(recipientEmail) + ")" : "ABSENT/MISSING"}.`);
       await this.logDelivery(request.id, ticketId, recipientEmail || "NONE", eventType, "skipped", undefined, "Missing or invalid email address");
       return { success: false, skipped: true, status: "skipped", error: "Missing or invalid email address." };
     }
 
+    this.logger.log(`[EMAIL] Recipient email PRESENT (${this.maskEmail(recipientEmail)}). Evaluating notification for Ticket: ${ticketId}`);
+
     // 2. Check Idempotency / Duplicate
     const isDup = await this.isDuplicate(ticketId, eventType, status);
     if (isDup) {
-      this.logger.log(`[EmailNotification] Idempotent skip: Duplicate notification event (${eventType}) detected for ${ticketId}.`);
+      this.logger.log(`[EMAIL] Idempotent skip: Duplicate notification event "${eventType}" already sent recently for ${ticketId}.`);
       return { success: true, skipped: true, status: "skipped" };
     }
 
@@ -241,11 +243,11 @@ export class EmailNotificationService {
     };
 
     const { subject, html, text } = generateEmailForEvent(eventType, templateData);
-
-    this.logger.log(`[EmailNotification] Attempting delivery for ticket ${ticketId} to ${this.maskEmail(recipientEmail)} [Event: ${eventType}]`);
+    this.logger.log(`[EMAIL] Selected template event: "${eventType}" -> Subject: "${subject}"`);
 
     // 6. Attempt provider delivery
     try {
+      this.logger.log(`[EMAIL_PROVIDER] Invoking ${this.provider.name} provider for Ticket: ${ticketId}, Recipient: ${this.maskEmail(recipientEmail)}`);
       const sendResult = await this.provider.sendEmail({
         to: recipientEmail,
         subject,
@@ -263,7 +265,7 @@ export class EmailNotificationService {
         const dedupKey = `${ticketId.toUpperCase()}:${eventType.toUpperCase()}:${status.toUpperCase()}`;
         this.recentNotifications.set(dedupKey, Date.now());
 
-        this.logger.log(`[EmailNotification] Delivery successful for ticket ${ticketId} (ID: ${sendResult.messageId || "ok"})`);
+        this.logger.log(`[EMAIL] Delivery SUCCESS for ticket ${ticketId}. Message ID: ${sendResult.messageId || "ok"}`);
         await this.logDelivery(request.id, ticketId, recipientEmail, eventType, "sent", sendResult.messageId);
         
         return {
@@ -272,7 +274,7 @@ export class EmailNotificationService {
           status: "sent"
         };
       } else {
-        this.logger.warn(`[EmailNotification] Delivery failed for ticket ${ticketId}: ${sendResult.error}`);
+        this.logger.warn(`[EMAIL] Delivery FAILED for ticket ${ticketId}. Provider error: ${sendResult.error}`);
         await this.logDelivery(request.id, ticketId, recipientEmail, eventType, "failed", undefined, sendResult.error);
         
         return {
@@ -283,7 +285,7 @@ export class EmailNotificationService {
       }
     } catch (err: any) {
       const errMsg = err?.message || "Internal email provider error";
-      this.logger.error(`[EmailNotification] Exception during email delivery for ${ticketId}: ${errMsg}`);
+      this.logger.error(`[EMAIL] Exception during email delivery for ${ticketId}: ${errMsg}`);
       await this.logDelivery(request.id, ticketId, recipientEmail, eventType, "failed", undefined, errMsg);
       
       return {

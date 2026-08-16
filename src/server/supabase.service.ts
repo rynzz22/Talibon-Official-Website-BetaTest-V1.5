@@ -9,8 +9,15 @@ export class SupabaseService {
     let rawUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+    const hasUrl = !!rawUrl && rawUrl.length > 5;
+    const hasServiceRoleKey = !!supabaseKey && supabaseKey.length > 5;
+
+    console.log(
+      `[SUPABASE_SERVER] Initialization check: SUPABASE_URL: ${hasUrl ? "PRESENT" : "MISSING"}, SUPABASE_SERVICE_ROLE_KEY: ${hasServiceRoleKey ? "PRESENT" : "MISSING"}`
+    );
+
     if (!rawUrl || !supabaseKey) {
-      console.warn("[Supabase Server] Warning: Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Backend services requiring Supabase will fail.");
+      console.warn("[SUPABASE_SERVER] Warning: Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Backend services requiring Supabase will fail.");
       return;
     }
 
