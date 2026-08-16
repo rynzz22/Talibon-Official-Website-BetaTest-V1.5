@@ -257,19 +257,8 @@ export const certificateService = {
       createdData = srData;
     }
 
-    // Insert initial record into workflow_history
+    // Insert initial history record if supported
     if (createdData?.id) {
-      try {
-        await supabase.from("workflow_history").insert({
-          request_id: createdData.id,
-          status: "Submitted",
-          remarks: "Application received and registered in municipal e-services queue."
-        });
-        console.log(`[CertificateService] Logged initial workflow_history entry for request ${createdData.id}`);
-      } catch (wfErr: any) {
-        console.warn("[CertificateService] Initial workflow_history insert warning:", wfErr?.message || wfErr);
-      }
-
       try {
         await supabase.from("service_request_history").insert({
           request_id: createdData.id,
@@ -277,7 +266,7 @@ export const certificateService = {
           remarks: "Application received and registered in municipal e-services queue."
         });
       } catch (srhErr: any) {
-        console.warn("[CertificateService] Initial service_request_history insert warning:", srhErr?.message || srhErr);
+        // Handled silently if client lacks direct table insert permissions (managed by backend)
       }
     }
 
@@ -402,41 +391,20 @@ export const certificateService = {
       return null;
     }
 
-    // Query related workflow_history records
+    // Query related service_request_history records
     let historyData: any[] = [];
     try {
-      const { data: wfData, error: wfError } = await supabase
-        .from("workflow_history")
+      const { data: srhData, error: srhError } = await supabase
+        .from("service_request_history")
         .select("*")
         .eq("request_id", requestData.id)
         .order("created_at", { ascending: false });
 
-      if (wfError) {
-        console.warn(`[Tracking Audit] workflow_history query error for request ${requestData.id}:`, wfError.message);
-      } else if (wfData && wfData.length > 0) {
-        historyData = wfData;
-        console.log(`[Tracking Audit] Loaded ${wfData.length} workflow_history records for request ${requestData.id}`);
+      if (!srhError && srhData && srhData.length > 0) {
+        historyData = srhData;
       }
-    } catch (e: any) {
-      console.warn(`[Tracking Audit] Exception loading workflow_history:`, e.message || e);
-    }
-
-    // Fallback to service_request_history if workflow_history returned 0 rows
-    if (historyData.length === 0) {
-      try {
-        const { data: srhData, error: srhError } = await supabase
-          .from("service_request_history")
-          .select("*")
-          .eq("request_id", requestData.id)
-          .order("created_at", { ascending: false });
-
-        if (!srhError && srhData && srhData.length > 0) {
-          historyData = srhData;
-          console.log(`[Tracking Audit] Loaded ${srhData.length} service_request_history records for request ${requestData.id}`);
-        }
-      } catch (e: any) {
-        console.warn(`[Tracking Audit] Exception loading service_request_history:`, e.message || e);
-      }
+    } catch {
+      // Ignore if history read fails
     }
 
     return mapDbToRequest(requestData, historyData);
@@ -468,20 +436,11 @@ export const certificateService = {
 
       if (listData && Array.isArray(listData)) {
         let historyData: any[] = [];
-        const { data: wfData } = await supabase
-          .from("workflow_history")
+        const { data: srhData } = await supabase
+          .from("service_request_history")
           .select("*")
           .order("created_at", { ascending: false });
-
-        if (wfData) {
-          historyData = wfData;
-        } else {
-          const { data: srhData } = await supabase
-            .from("service_request_history")
-            .select("*")
-            .order("created_at", { ascending: false });
-          if (srhData) historyData = srhData;
-        }
+        if (srhData) historyData = srhData;
 
         return listData.map((requestData: any) => {
           const itemHistory = historyData 
@@ -577,16 +536,8 @@ export const certificateService = {
             status: dbStatus,
             remarks: remarks || `Status updated to ${status}`
           });
-        } catch (histErr) {
-          try {
-            await supabase.from("workflow_history").insert({
-              request_id: requestId,
-              status: dbStatus,
-              remarks: remarks || `Status updated to ${status}`
-            });
-          } catch (wfErr) {
-            console.warn("[CertificateService] Workflow history insert skipped:", wfErr);
-          }
+        } catch {
+          // Handled if client lacks direct table insert permissions
         }
       }
 
