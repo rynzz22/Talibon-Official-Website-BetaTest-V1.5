@@ -20,7 +20,8 @@ import { FormsService } from "./api/forms/forms.service";
 import { PaymentsModule } from "./api/payments/payments.module";
 import { PaymentsController } from "./api/payments/payments.controller";
 import { PaymentsService } from "./api/payments/payments.service";
-
+import { NotificationsModule } from "./api/notifications/notification.module";
+import { EmailNotificationService } from "./api/notifications/email-notification.service";
 import { SupabaseService } from "./supabase.service";
 import { RateLimiterGuard } from "./security/rate-limiter.guard";
 import { AuthGuard } from "./security/auth.guard";
@@ -29,7 +30,7 @@ import { CacheControlMiddleware } from "./security/cache-control.middleware";
 import { AllExceptionsFilter } from "./security/all-exceptions.filter";
 
 @Module({
-  imports: [PaymentsModule],
+  imports: [PaymentsModule, NotificationsModule],
   controllers: [
     AboutController,
     ExecutiveController,
@@ -42,6 +43,7 @@ import { AllExceptionsFilter } from "./security/all-exceptions.filter";
   ],
   providers: [
     SupabaseService,
+    EmailNotificationService,
     AboutService,
     ExecutiveService,
     LegislativeService,

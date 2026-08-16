@@ -63,9 +63,11 @@ export class FormsController {
       dto.status,
       dto.remarks || "",
       dto.notifyCitizen !== false,
-      dto.saveTimeline !== false
+      dto.saveTimeline !== false,
+      dto.notifyEmail !== false,
+      dto.requirements
     );
-    return { success };
+    return { success, notificationQueued: true };
   }
 
   @Get("downloadable")

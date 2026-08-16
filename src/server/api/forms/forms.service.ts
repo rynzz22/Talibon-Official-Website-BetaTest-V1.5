@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, Inject } from "@nestjs/common";
 import { SupabaseService } from "../../supabase.service";
+import { EmailNotificationService } from "../notifications/email-notification.service";
 
 export interface CertificateRequestPayload {
   id?: string;
@@ -20,12 +21,14 @@ export interface CertificateRequestPayload {
     createdAt: string;
   }[];
 }
-
 @Injectable()
 export class FormsService {
   private requests: CertificateRequestPayload[] = [];
 
-  constructor(@Inject(SupabaseService) private readonly supabaseService: SupabaseService) {
+  constructor(
+    @Inject(SupabaseService) private readonly supabaseService: SupabaseService,
+    @Inject(EmailNotificationService) private readonly emailNotificationService: EmailNotificationService
+  ) {
     // Try fetching from Supabase if connected
     this.loadFromSupabase();
   }
@@ -95,7 +98,9 @@ export class FormsService {
     status: string,
     remarks: string,
     notifyCitizen: boolean = true,
-    saveTimeline: boolean = true
+    saveTimeline: boolean = true,
+    notifyEmail: boolean = true,
+    requirements?: string[]
   ): Promise<boolean> {
     try {
       const client = this.supabaseService.getClient();
@@ -123,10 +128,10 @@ export class FormsService {
           dbStatus = "Rejected";
         }
 
-        // Get current request to check its current DB status
+        // Get current request to check its current DB status and retrieve citizen data
         const { data: currentReq, error: fetchError } = await client
           .from("certificate_requests")
-          .select("status")
+          .select("id, ticket_id, document_type, full_name, email, mobile_number, barangay_id, status")
           .eq("id", requestId)
           .maybeSingle();
 
@@ -210,19 +215,38 @@ export class FormsService {
           found.status = status;
         }
 
+        // Handle Email Notification
+        if (notifyEmail && currentReq?.email) {
+          const reqDataForEmail = {
+            id: currentReq.id || requestId,
+            ticketId: currentReq.ticket_id || found?.ticketId || "TLB-REQUEST",
+            documentType: currentReq.document_type || found?.documentType || "Certificate Request",
+            fullName: currentReq.full_name || found?.fullName || "Citizen",
+            email: currentReq.email,
+            mobileNumber: currentReq.mobile_number,
+            barangay: currentReq.barangay_id,
+            status: status
+          };
+
+          const isReqs = ["RETURNED", "ADDITIONAL REQUIREMENTS NEEDED", "ADDITIONAL_REQUIREMENTS"].includes(upper);
+          if (isReqs) {
+            this.emailNotificationService
+              .sendAdditionalRequirements(reqDataForEmail, remarks, requirements)
+              .catch((e: unknown) => console.warn("[FormsService] Email notification error (additional reqs):", e));
+          } else {
+            this.emailNotificationService
+              .sendStatusUpdate(reqDataForEmail, status, remarks)
+              .catch((e: unknown) => console.warn("[FormsService] Email notification error (status update):", e));
+          }
+        }
+
         // In-app Notification Creation
-        if (notifyCitizen) {
-          const { data: reqData } = await client
-            .from("certificate_requests")
-            .select("email, ticket_id, document_type")
-            .eq("id", requestId)
-            .maybeSingle();
+        if (notifyCitizen && currentReq) {
+          const citizenEmail = currentReq.email;
+          const ticketId = currentReq.ticket_id;
+          const docType = currentReq.document_type;
 
-          if (reqData) {
-            const citizenEmail = reqData.email;
-            const ticketId = reqData.ticket_id;
-            const docType = reqData.document_type;
-
+          if (citizenEmail) {
             // Find the profile of the citizen using email
             const { data: citizenProfile } = await client
               .from("profiles")
@@ -290,6 +314,24 @@ export class FormsService {
     const found = this.requests.find(r => r.id === requestId);
     if (found) {
       found.status = status;
+      if (notifyEmail && found.email) {
+        this.emailNotificationService
+          .sendStatusUpdate(
+            {
+              id: found.id || requestId,
+              ticketId: found.ticketId || "TLB-REQUEST",
+              documentType: found.documentType,
+              fullName: found.fullName,
+              email: found.email,
+              mobileNumber: found.mobileNumber,
+              barangay: found.barangay,
+              status: status
+            },
+            status,
+            remarks
+          )
+          .catch((e: unknown) => console.warn("[FormsService] Email notification error (in-memory):", e));
+      }
       return true;
     }
     return false;
@@ -415,6 +457,24 @@ export class FormsService {
 
     // Store in memory
     this.requests.unshift(newRequest);
+
+    // Dispatch asynchronous submission email notification
+    if (newRequest.email) {
+      this.emailNotificationService
+        .sendRequestSubmitted({
+          id: newRequest.id,
+          ticketId: newRequest.ticketId || "TLB-REQUEST",
+          documentType: newRequest.documentType,
+          fullName: newRequest.fullName,
+          email: newRequest.email,
+          mobileNumber: newRequest.mobileNumber,
+          barangay: newRequest.barangay,
+          status: newRequest.status,
+          submittedAt: newRequest.submittedAt
+        })
+        .catch((e: unknown) => console.warn("[FormsService] Submission email dispatch error:", e));
+    }
+
     return newRequest;
   }
 

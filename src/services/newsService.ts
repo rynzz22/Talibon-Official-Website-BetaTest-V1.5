@@ -36,6 +36,7 @@ export const newsService = {
         const { data, error } = await supabase
           .from("news")
           .select("*")
+          .is("deleted_at", null)
           .order("date", { ascending: false });
         if (error) throw error;
         if (data) return data as NewsItem[];
@@ -51,6 +52,94 @@ export const newsService = {
       throw new Error("[NewsService] Supabase is unconfigured. Production Mode requires a live database connection.");
     }
     return getStorageNews();
+  },
+
+  async getNewsById(identifier: string): Promise<NewsItem | null> {
+    if (!identifier) return null;
+
+    let cleanId = identifier.trim();
+    try {
+      cleanId = decodeURIComponent(cleanId).trim();
+    } catch {
+      // ignore decoding error and use raw
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
+    const identifierType = isUuid ? "UUID (id)" : "SLUG / STRING ID";
+
+    console.log(`[NewsService:Detail] Fetching news. Route param: "${identifier}", Decoded: "${cleanId}", Identifier Type: ${identifierType}`);
+
+    if (isSupabaseConfigured) {
+      try {
+        // 1. Primary lookup based on UUID or matching ID
+        if (isUuid) {
+          const { data, error } = await supabase
+            .from("news")
+            .select("*")
+            .eq("id", cleanId)
+            .is("deleted_at", null)
+            .maybeSingle();
+
+          if (error) {
+            console.warn(`[NewsService:Detail] Supabase query error for ID "${cleanId}":`, error.message || error);
+          } else if (data) {
+            console.log(`[NewsService:Detail] Found record by ID: "${data.id}" - Title: "${data.title}"`);
+            return data as NewsItem;
+          }
+        } else {
+          // 2. Lookup for non-UUID strings: try slug first, then fallback to id if string id column
+          const { data: slugData, error: slugError } = await supabase
+            .from("news")
+            .select("*")
+            .eq("slug", cleanId)
+            .is("deleted_at", null)
+            .maybeSingle();
+
+          if (slugError) {
+            console.warn(`[NewsService:Detail] Supabase query error for slug "${cleanId}":`, slugError.message || slugError);
+          } else if (slugData) {
+            console.log(`[NewsService:Detail] Found record by slug: "${slugData.id}" - Title: "${slugData.title}"`);
+            return slugData as NewsItem;
+          }
+
+          // Fallback: in case non-UUID format is an ID in string format
+          try {
+            const { data: idData, error: idError } = await supabase
+              .from("news")
+              .select("*")
+              .eq("id", cleanId)
+              .is("deleted_at", null)
+              .maybeSingle();
+
+            if (!idError && idData) {
+              console.log(`[NewsService:Detail] Found record by string ID: "${idData.id}"`);
+              return idData as NewsItem;
+            }
+          } catch {
+            // Ignore type error if UUID mismatch
+          }
+        }
+
+        console.log(`[NewsService:Detail] No database record returned for "${cleanId}"`);
+      } catch (err: any) {
+        console.warn(`[NewsService:Detail] Exception querying Supabase:`, err.message || err);
+      }
+    }
+
+    // Fallback for offline/mock development
+    const list = getStorageNews();
+    const found = list.find((n) => n.id === cleanId || n.slug === cleanId || n.title.toLowerCase() === cleanId.toLowerCase());
+    if (found) {
+      console.log(`[NewsService:Detail] Found record in mock/local storage: "${found.id}"`);
+      return found;
+    }
+
+    const initFound = INITIAL_NEWS.find(n => n.id === cleanId || n.slug === cleanId);
+    if (initFound) {
+      return initFound;
+    }
+
+    return null;
   },
 
   async createNews(item: Omit<NewsItem, "id">, userEmail: string): Promise<NewsItem> {

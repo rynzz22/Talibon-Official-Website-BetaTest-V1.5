@@ -57,6 +57,7 @@ export default function Events() {
         .from('news')
         .select('*')
         .is('barangay_id', null)
+        .is('deleted_at', null)
         .order('date', { ascending: false })
         .limit(3);
 

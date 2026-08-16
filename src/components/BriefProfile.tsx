@@ -17,7 +17,7 @@ const BriefProfile: React.FC = () => {
         return res.json();
       })
       .then(data => setProfile(data))
-      .catch(err => console.error('Error fetching profile:', err));
+      .catch((err: unknown) => console.error('Error fetching profile:', err));
   }, []);
 
   const stats = [
