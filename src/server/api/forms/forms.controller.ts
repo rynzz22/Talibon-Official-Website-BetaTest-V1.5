@@ -58,6 +58,7 @@ export class FormsController {
     if (!id || id.length > 100) {
       throw new BadRequestException("Invalid request ID.");
     }
+    console.log(`[FORMS_API] Request received: PUT /api/forms/certificate/${id}/status -> Target Status: "${dto.status}", notifyEmail: ${dto.notifyEmail !== false}, notifyCitizen: ${dto.notifyCitizen !== false}`);
     const success = await this.formsService.updateRequestStatus(
       id,
       dto.status,
@@ -67,6 +68,7 @@ export class FormsController {
       dto.notifyEmail !== false,
       dto.requirements
     );
+    console.log(`[FORMS_API] Status transition completed for request ID ${id}. Result: ${success ? "SUCCESS" : "FAILED"}`);
     return { success, notificationQueued: true };
   }
 

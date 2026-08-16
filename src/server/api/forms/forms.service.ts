@@ -130,13 +130,19 @@ export class FormsService {
         }
 
         // Get current request to check its current DB status and retrieve citizen data
+        console.log(`[FORMS_API] FormsService.updateRequestStatus started for ID: ${requestId}, Target DB Status: "${dbStatus}"`);
         const { data: currentReq, error: fetchError } = await client
           .from("certificate_requests")
           .select("id, ticket_id, document_type, full_name, email, mobile_number, barangay_id, status")
           .eq("id", requestId)
           .maybeSingle();
 
+        if (fetchError) {
+          console.warn(`[FORMS_API] Warning fetching request ${requestId}:`, fetchError.message);
+        }
+
         const currentDbStatus = currentReq?.status || "";
+        console.log(`[FORMS_API] Current DB Status for ${requestId}: "${currentDbStatus}" -> Transitioning to "${dbStatus}"`);
 
         if (currentDbStatus === dbStatus) {
           // If DB status is the same, trigger won't run. Manually insert history if requested
@@ -147,8 +153,9 @@ export class FormsService {
                 status: dbStatus,
                 remarks: remarks || `Status updated in portal: ${status}`
               });
+              console.log(`[FORMS_API] Manual service_request_history inserted (status unchanged at "${dbStatus}")`);
             } catch (histErr: any) {
-              console.warn("[FormsService] Failed to insert service_request_history:", histErr.message || histErr);
+              console.warn("[FORMS_API] Failed to insert service_request_history:", histErr.message || histErr);
             }
           }
         } else {
@@ -164,16 +171,20 @@ export class FormsService {
 
             if (!srError) {
               updateSuccess = true;
+              console.log(`[FORMS_API] Database update SUCCESS via public.service_requests for ID: ${requestId}`);
             } else {
               const { error: crError } = await client
                 .from("certificate_requests")
                 .update({ status: dbStatus })
                 .eq("id", requestId);
 
-              if (!crError) updateSuccess = true;
+              if (!crError) {
+                updateSuccess = true;
+                console.log(`[FORMS_API] Database update SUCCESS via public.certificate_requests for ID: ${requestId}`);
+              }
             }
           } catch (updateErr) {
-            console.warn("[FormsService] Direct table update error:", updateErr);
+            console.warn("[FORMS_API] Direct table update exception:", updateErr);
           }
 
           if (updateSuccess) {
@@ -184,8 +195,9 @@ export class FormsService {
                   status: dbStatus,
                   remarks: remarks || `Status updated via Admin Dashboard: ${status}`
                 });
+                console.log(`[FORMS_API] service_request_history entry created for ID: ${requestId}`);
               } catch (histErr: any) {
-                console.warn("[FormsService] service_request_history insert error:", histErr?.message || histErr);
+                console.warn("[FORMS_API] service_request_history insert warning:", histErr?.message || histErr);
               }
             }
           } else {
@@ -196,8 +208,9 @@ export class FormsService {
                 p_status: dbStatus,
                 p_remarks: remarks || `Status updated via Admin Dashboard: ${status}`
               });
+              console.log(`[FORMS_API] Database update SUCCESS via RPC update_request_status for ID: ${requestId}`);
             } catch (rpcErr) {
-              console.warn("[FormsService] RPC update_request_status failed:", rpcErr);
+              console.warn("[FORMS_API] RPC update_request_status failed:", rpcErr);
             }
           }
         }
@@ -209,28 +222,35 @@ export class FormsService {
         }
 
         // Handle Email Notification
-        if (notifyEmail && currentReq?.email) {
-          const reqDataForEmail = {
-            id: currentReq.id || requestId,
-            ticketId: currentReq.ticket_id || found?.ticketId || "TLB-REQUEST",
-            documentType: currentReq.document_type || found?.documentType || "Certificate Request",
-            fullName: currentReq.full_name || found?.fullName || "Citizen",
-            email: currentReq.email,
-            mobileNumber: currentReq.mobile_number,
-            barangay: currentReq.barangay_id,
-            status: status
-          };
+        if (notifyEmail) {
+          if (currentReq?.email) {
+            console.log(`[FORMS_API] Triggering EmailNotificationService for Ticket: ${currentReq.ticket_id || requestId}`);
+            const reqDataForEmail = {
+              id: currentReq.id || requestId,
+              ticketId: currentReq.ticket_id || found?.ticketId || "TLB-REQUEST",
+              documentType: currentReq.document_type || found?.documentType || "Certificate Request",
+              fullName: currentReq.full_name || found?.fullName || "Citizen",
+              email: currentReq.email,
+              mobileNumber: currentReq.mobile_number,
+              barangay: currentReq.barangay_id,
+              status: status
+            };
 
-          const isReqs = ["RETURNED", "ADDITIONAL REQUIREMENTS NEEDED", "ADDITIONAL_REQUIREMENTS"].includes(upper);
-          if (isReqs) {
-            this.emailNotificationService
-              .sendAdditionalRequirements(reqDataForEmail, remarks, requirements)
-              .catch((e: unknown) => console.warn("[FormsService] Email notification error (additional reqs):", e));
+            const isReqs = ["RETURNED", "ADDITIONAL REQUIREMENTS NEEDED", "ADDITIONAL_REQUIREMENTS"].includes(upper);
+            if (isReqs) {
+              this.emailNotificationService
+                .sendAdditionalRequirements(reqDataForEmail, remarks, requirements)
+                .catch((e: unknown) => console.warn("[FORMS_API] Email notification error (additional reqs):", e));
+            } else {
+              this.emailNotificationService
+                .sendStatusUpdate(reqDataForEmail, status, remarks)
+                .catch((e: unknown) => console.warn("[FORMS_API] Email notification error (status update):", e));
+            }
           } else {
-            this.emailNotificationService
-              .sendStatusUpdate(reqDataForEmail, status, remarks)
-              .catch((e: unknown) => console.warn("[FormsService] Email notification error (status update):", e));
+            console.log(`[FORMS_API] Email notification skipped: Citizen email is ABSENT for request ${requestId}`);
           }
+        } else {
+          console.log(`[FORMS_API] Email notification skipped: notifyEmail flag is set to false`);
         }
 
         // In-app Notification Creation

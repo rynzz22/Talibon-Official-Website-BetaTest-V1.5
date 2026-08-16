@@ -12,6 +12,7 @@ async function bootstrapServer(): Promise<Express> {
     return cachedServer;
   }
 
+  console.log("[VERCEL_API] Cold start: Initializing NestJS serverless application on Vercel...");
   const expressApp: Express = express();
   const adapter = new ExpressAdapter(expressApp);
 
@@ -62,10 +63,12 @@ async function bootstrapServer(): Promise<Express> {
 
   await app.init();
   cachedServer = expressApp;
+  console.log("[VERCEL_API] NestJS serverless initialization completed successfully.");
   return cachedServer;
 }
 
 export default async function handler(req: Request, res: Response) {
+  console.log(`[VERCEL_API] Incoming request: ${req.method} ${req.url}`);
   const server = await bootstrapServer();
   return server(req, res);
 }
