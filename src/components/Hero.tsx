@@ -11,12 +11,12 @@ interface HeroProps {
 }
 
 const OFFICIAL_TALIBON_VIDEO_URL = "https://talibon.gov.ph/wp-content/uploads/2025/11/AQNfA76VxqBsdOkCQGUI91qEDtBLVfxVALb-H9LBY6HdxHPZYsDhTPqmq4uncItBA1u5CUFmq7KAQA3usI2om9XI_dJCwqeJLyINzeVU7fug1A.mp4";
-const DEFAULT_POSTER_URL = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=3840&q=90";
 
 const Hero: React.FC<HeroProps> = ({ overrideTitle, overrideSubtitle }) => {
   const { t, language } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
+
   const [isMuted, setIsMuted] = useState<boolean>(true);
   const userWantsAudioRef = useRef<boolean>(false);
   const isHeroInViewRef = useRef<boolean>(true);
@@ -101,20 +101,14 @@ const Hero: React.FC<HeroProps> = ({ overrideTitle, overrideSubtitle }) => {
 
   return (
     <section ref={sectionRef} id="home" className="relative min-h-screen w-full overflow-hidden flex flex-col items-start justify-center pt-28 sm:pt-36 lg:pt-40 pb-12 sm:pb-16 lg:pb-20 px-0">
-      {/* Background Image / Video Stream */}
-      <div 
-        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat bg-slate-900"
-        style={{ 
-          backgroundImage: `url('${DEFAULT_POSTER_URL}')` 
-        }}
-      >
+      {/* Background Video Stream */}
+      <div className="absolute inset-0 z-0 bg-slate-950">
         <video
           ref={videoRef}
           autoPlay
           muted={isMuted}
           loop
           playsInline
-          poster={DEFAULT_POSTER_URL}
           className="w-full h-full object-cover object-center min-w-full min-h-full scale-[1.01]"
         >
           <source 
