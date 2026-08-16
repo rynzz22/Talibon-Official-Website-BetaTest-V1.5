@@ -50,23 +50,23 @@ export class ResendEmailProvider implements EmailProvider {
 
     console.log(`[EMAIL_PROVIDER] Dispatching via Resend API -> To: ${maskedTo}, From: ${formattedFrom}, Subject: "${options.subject}"`);
 
+    const payload: Record<string, any> = {
+      from: formattedFrom,
+      to: [options.to],
+      subject: options.subject,
+      html: options.html,
+      text: options.text
+    };
+
+    if (options.replyTo) {
+      payload.reply_to = options.replyTo;
+    }
+
+    if (options.tags) {
+      payload.tags = Object.entries(options.tags).map(([name, value]) => ({ name, value }));
+    }
+
     try {
-      const payload: Record<string, any> = {
-        from: formattedFrom,
-        to: [options.to],
-        subject: options.subject,
-        html: options.html,
-        text: options.text
-      };
-
-      if (options.replyTo) {
-        payload.reply_to = options.replyTo;
-      }
-
-      if (options.tags) {
-        payload.tags = Object.entries(options.tags).map(([name, value]) => ({ name, value }));
-      }
-
       const response = await axios.post("https://api.resend.com/emails", payload, {
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
@@ -97,14 +97,25 @@ export class ResendEmailProvider implements EmailProvider {
 
       if (status === 401) {
         console.error(`[EMAIL_PROVIDER] Resend HTTP 401 Unauthorized: Invalid or revoked RESEND_API_KEY.`);
-      } else if (status === 403) {
-        console.error(
-          `[EMAIL_PROVIDER] Resend HTTP 403 Forbidden: Sender domain not verified or recipient not permitted. ` +
-          `Sender: "${fromAddress}". Resend Message: "${resendErrorMessage}". ` +
-          `Note: Free/test Resend accounts require a verified custom domain to send to external recipients, or can only send to the account owner's email address.`
-        );
-      } else if (status === 422 || status === 400) {
-        console.error(`[EMAIL_PROVIDER] Resend HTTP ${status} Validation Error: ${resendErrorName} - ${resendErrorMessage}`);
+      } else if (status === 403 || status === 400 || status === 422) {
+        const isSandboxError =
+          resendErrorMessage.toLowerCase().includes("testing emails") ||
+          resendErrorMessage.toLowerCase().includes("verify a domain") ||
+          resendErrorMessage.toLowerCase().includes("domain");
+
+        if (isSandboxError) {
+          const domain = fromAddress.includes("@") ? fromAddress.split("@")[1] : "talibon.gov.ph";
+          console.error(
+            `[EMAIL_PROVIDER] Resend Domain/Sandbox Error: Cannot deliver to citizen (${maskedTo}). ` +
+            `Sender address "${fromAddress}" requires domain verification in Resend. ` +
+            `Action Required: Add and verify the domain "${domain}" at https://resend.com/domains (with SPF & DKIM DNS records). ` +
+            `Provider message: "${resendErrorMessage}"`
+          );
+        } else {
+          console.error(
+            `[EMAIL_PROVIDER] Resend HTTP ${status} Error: ${resendErrorName} - ${resendErrorMessage}`
+          );
+        }
       } else if (status === 429) {
         console.error(`[EMAIL_PROVIDER] Resend HTTP 429 Rate Limit Exceeded: ${resendErrorMessage}`);
       } else if (status >= 500) {
