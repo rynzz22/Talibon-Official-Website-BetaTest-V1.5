@@ -6,7 +6,7 @@ import {
   Sparkles, ShieldAlert, X, Copy, RefreshCw, File, HelpCircle, FileCheck,
   ArrowLeft, Briefcase, Building2, MapPin, ChevronRight
 } from "lucide-react";
-import { certificateService, getLocalRequests, clearLocalRequests } from "../services/certificateService";
+import { certificateService, getLocalRequests, clearLocalRequests, type CertificateRequest, type TimelineEvent } from "../services/certificateService";
 import { servicesCmsService } from "../services/servicesCmsService";
 import ECedulaForm from "../components/eservices/ECedula/ECedulaForm";
 import EBusinessPermitForm from "../components/eservices/EBusinessPermitForm";
@@ -16,25 +16,7 @@ import EBarangayClearanceForm from "../components/eservices/EBarangayClearanceFo
 import ECertificateOfIndigencyForm from "../components/eservices/ECertificateOfIndigencyForm";
 import { RequestSummary } from "../components/eservices/RequestSummary";
 
-// Interface matching the backend JSON schema payload
-export interface CertificateRequest {
-  ticketId: string;
-  documentType: string;
-  barangay: string;
-  fullName: string;
-  email: string;
-  mobileNumber: string;
-  purpose: string;
-  attachments: string[];
-  submittedAt: string;
-  status: string;
-  history?: {
-    id?: string;
-    status: string;
-    remarks: string | null;
-    createdAt: string;
-  }[];
-}
+export type { CertificateRequest, TimelineEvent };
 
 export default function EServicesPage() {
   const [searchParams] = useSearchParams();
@@ -458,18 +440,58 @@ export default function EServicesPage() {
     };
   };
 
-  const getTimelineEvents = () => {
+  // Find matching CMS Municipal Service from live Supabase DB for active tracked ticket
+  const matchedService = cmsServices.find(s => {
+    if (!s || !trackedRequest) return false;
+    const docLower = (trackedRequest.documentType || "").toLowerCase().trim();
+    const sNameLower = (s.name || "").toLowerCase().trim();
+    const sSlugLower = (s.slug || "").toLowerCase().trim();
+
+    if (docLower === sNameLower || docLower === sSlugLower) return true;
+    if (sNameLower.includes(docLower) || docLower.includes(sNameLower)) return true;
+    if (sSlugLower.includes(docLower) || docLower.includes(sSlugLower)) return true;
+
+    // Cedula / Community Tax
+    if ((docLower.includes("cedula") || docLower.includes("community tax") || docLower.includes("ctc")) &&
+        (sNameLower.includes("cedula") || sSlugLower.includes("cedula") || sNameLower.includes("tax"))) return true;
+
+    // Business Permit
+    if (docLower.includes("business") &&
+        (sNameLower.includes("business") || sSlugLower.includes("business") || sNameLower.includes("permit"))) return true;
+
+    // Building Permit
+    if (docLower.includes("building") &&
+        (sNameLower.includes("building") || sSlugLower.includes("building"))) return true;
+
+    // Zoning Clearance
+    if (docLower.includes("zoning") &&
+        (sNameLower.includes("zoning") || sSlugLower.includes("zoning"))) return true;
+
+    // Barangay Clearance
+    if (docLower.includes("barangay") &&
+        (sNameLower.includes("barangay") || sSlugLower.includes("barangay") || sNameLower.includes("clearance"))) return true;
+
+    // Indigency
+    if (docLower.includes("indigency") &&
+        (sNameLower.includes("indigency") || sSlugLower.includes("indigency"))) return true;
+
+    return false;
+  });
+
+  const getTimelineEvents = (): TimelineEvent[] => {
     if (!trackedRequest) return [];
     if (trackedRequest.history && trackedRequest.history.length > 0) {
       return trackedRequest.history;
     }
     
-    // Smart fallback timeline events based on status index
-    const events = [];
+    // Smart fallback timeline events based on status index with stable generated IDs
+    const events: TimelineEvent[] = [];
     const baseTime = new Date(trackedRequest.submittedAt || new Date());
+    const ticketSeed = trackedRequest.ticketId || "TLB";
     
     // Event 1: Submitted
     events.push({
+      id: `${ticketSeed}-step-submitted`,
       status: "Submitted",
       remarks: "Application submitted and logged into Talibon digital core system.",
       createdAt: baseTime.toISOString()
@@ -481,6 +503,7 @@ export default function EServicesPage() {
       // Under Review
       const reviewTime = new Date(baseTime.getTime() + 15 * 60 * 1000); // +15 mins
       events.push({
+        id: `${ticketSeed}-step-review`,
         status: "Under Review",
         remarks: "Barangay administrative staff started verification process.",
         createdAt: reviewTime.toISOString()
@@ -489,9 +512,13 @@ export default function EServicesPage() {
 
     if (trackedRequest.status === "Additional Requirements Needed") {
       const returnedTime = new Date(baseTime.getTime() + 30 * 60 * 1000); // +30 mins
+      const requirementNote = (matchedService?.requirements && matchedService.requirements.length > 0)
+        ? matchedService.requirements.join("; ")
+        : "Additional requirements are required for this application. Please check with the municipal office.";
       events.push({
+        id: `${ticketSeed}-step-additional-reqs`,
         status: "Additional Requirements Needed",
-        remarks: "Please submit a clearer copy of your Valid ID. The original upload was blurry.",
+        remarks: requirementNote,
         createdAt: returnedTime.toISOString()
       });
     }
@@ -500,6 +527,7 @@ export default function EServicesPage() {
       // Approved
       const approvedTime = new Date(baseTime.getTime() + 45 * 60 * 1000); // +45 mins
       events.push({
+        id: `${ticketSeed}-step-approved`,
         status: "Approved",
         remarks: "Your application has been verified and approved by the municipal registrar.",
         createdAt: approvedTime.toISOString()
@@ -510,6 +538,7 @@ export default function EServicesPage() {
       // Ready for Pickup
       const readyTime = new Date(baseTime.getTime() + 60 * 60 * 1000); // +1 hour
       events.push({
+        id: `${ticketSeed}-step-ready`,
         status: "Ready for Pickup",
         remarks: "Your certificate has been printed, sealed, and is ready for pickup at Treasury Office.",
         createdAt: readyTime.toISOString()
@@ -519,6 +548,7 @@ export default function EServicesPage() {
     if (trackedRequest.status === "Rejected") {
       const rejectedTime = new Date(baseTime.getTime() + 35 * 60 * 1000); // +35 mins
       events.push({
+        id: `${ticketSeed}-step-rejected`,
         status: "Rejected",
         remarks: "Verification declined due to residency validation failure.",
         createdAt: rejectedTime.toISOString()
@@ -529,6 +559,7 @@ export default function EServicesPage() {
       // Completed
       const completedTime = new Date(baseTime.getTime() + 120 * 60 * 1000); // +2 hours
       events.push({
+        id: `${ticketSeed}-step-completed`,
         status: "Completed",
         remarks: "Document claimed by resident and ticket archived.",
         createdAt: completedTime.toISOString()
@@ -1196,6 +1227,26 @@ export default function EServicesPage() {
                             );
                           })}
                         </div>
+
+                        {/* Dynamic Database Requirements & Instructions */}
+                        {matchedService?.requirements && matchedService.requirements.length > 0 && (
+                          <div className="bg-amber-50/60 border border-amber-200/60 rounded-xl p-3 space-y-1.5 mt-3">
+                            <div className="flex items-center gap-1.5 text-amber-800">
+                              <FileCheck size={13} className="shrink-0 text-amber-600" />
+                              <span className="text-[9.5px] font-black uppercase tracking-wider">
+                                Official Service Requirements Checklist
+                              </span>
+                            </div>
+                            <ul className="space-y-1 pl-1">
+                              {matchedService.requirements.map((req: string, idx: number) => (
+                                <li key={idx} className="text-xs text-slate-800 font-medium flex items-start gap-1.5">
+                                  <span className="text-amber-600 font-bold leading-none mt-0.5">•</span>
+                                  <span className="leading-snug">{req}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1206,6 +1257,7 @@ export default function EServicesPage() {
                         purposeJson={trackedRequest.purpose}
                         ticketId={trackedRequest.ticketId}
                         submittedAt={trackedRequest.submittedAt}
+                        requirements={matchedService?.requirements}
                       />
                     )}
                   </motion.div>
