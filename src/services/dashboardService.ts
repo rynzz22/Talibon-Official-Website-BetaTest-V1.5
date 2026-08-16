@@ -74,8 +74,8 @@ export const dashboardService = {
           pending_applications: reqRes.count || 0,
           total_gad_beneficiaries: gadRes.count || 0
         };
-      } catch (e: any) {
-        console.warn("[DashboardService] Failed to fetch view_dashboard_aggregates:", e.message || e);
+      } catch {
+        // Fallback to base table counts if optional view is missing
       }
     }
 
@@ -134,8 +134,8 @@ export const dashboardService = {
 
           return Array.from(statsMap.values());
         }
-      } catch (e: any) {
-        console.warn("[DashboardService] Failed to fetch view_monthly_request_stats:", e.message || e);
+      } catch {
+        // Fallback to default if table query fails
       }
     }
 
@@ -157,17 +157,17 @@ export const dashboardService = {
 
         if (!error && data && data.length > 0) return data as GADSectoralStat[];
 
-        // Fallback: Query gad_beneficiaries directly
+        // Fallback: Query gad_beneficiaries directly using canonical columns (gender, sector)
         const { data: bens, error: bensError } = await supabase
           .from("gad_beneficiaries")
-          .select("sex, civil_status");
+          .select("gender, sector");
 
         if (!bensError && bens && bens.length > 0) {
           const statsMap = new Map<string, GADSectoralStat>();
 
-          for (const b of bens) {
-            const sex = b.sex || "Unspecified";
-            const civilStatus = b.civil_status || "Single";
+          for (const b of bens as any[]) {
+            const sex = b.gender || "Unspecified";
+            const civilStatus = b.sector || "General";
             const key = `${sex}:${civilStatus}`;
 
             if (statsMap.has(key)) {
@@ -183,8 +183,8 @@ export const dashboardService = {
 
           return Array.from(statsMap.values());
         }
-      } catch (e: any) {
-        console.warn("[DashboardService] Failed to fetch view_gad_sectoral_stats:", e.message || e);
+      } catch {
+        // Suppress expected fallback exception
       }
     }
 

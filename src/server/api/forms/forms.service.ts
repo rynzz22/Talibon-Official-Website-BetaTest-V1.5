@@ -21,6 +21,7 @@ export interface CertificateRequestPayload {
     createdAt: string;
   }[];
 }
+
 @Injectable()
 export class FormsService {
   private requests: CertificateRequestPayload[] = [];
@@ -138,16 +139,16 @@ export class FormsService {
         const currentDbStatus = currentReq?.status || "";
 
         if (currentDbStatus === dbStatus) {
-          // If DB status is the same, trigger won't run. Manually insert workflow history if requested!
+          // If DB status is the same, trigger won't run. Manually insert history if requested
           if (saveTimeline) {
             try {
-              await client.from("workflow_history").insert({
+              await client.from("service_request_history").insert({
                 request_id: requestId,
                 status: dbStatus,
                 remarks: remarks || `Status updated in portal: ${status}`
               });
             } catch (histErr: any) {
-              console.warn("[FormsService] Failed to insert workflow history (table may not exist):", histErr.message || histErr);
+              console.warn("[FormsService] Failed to insert service_request_history:", histErr.message || histErr);
             }
           }
         } else {
@@ -184,15 +185,7 @@ export class FormsService {
                   remarks: remarks || `Status updated via Admin Dashboard: ${status}`
                 });
               } catch (histErr: any) {
-                try {
-                  await client.from("workflow_history").insert({
-                    request_id: requestId,
-                    status: dbStatus,
-                    remarks: remarks || `Status updated via Admin Dashboard: ${status}`
-                  });
-                } catch (wfErr) {
-                  console.warn("[FormsService] Workflow history insert skipped:", wfErr);
-                }
+                console.warn("[FormsService] service_request_history insert error:", histErr?.message || histErr);
               }
             }
           } else {
@@ -522,27 +515,20 @@ export class FormsService {
         }
 
         if (data) {
-          // Fetch workflow history chronological timeline!
+          // Fetch status history chronological timeline
           let historyData: any[] = [];
           try {
-            const { data: hist, error: histError } = await client
-              .from("workflow_history")
+            const { data: srh, error: histError } = await client
+              .from("service_request_history")
               .select("*")
               .eq("request_id", data.id)
               .order("created_at", { ascending: true });
             
-            if (!histError && hist && hist.length > 0) {
-              historyData = hist;
-            } else {
-              const { data: srh } = await client
-                .from("service_request_history")
-                .select("*")
-                .eq("request_id", data.id)
-                .order("created_at", { ascending: true });
-              if (srh) historyData = srh;
+            if (!histError && srh && srh.length > 0) {
+              historyData = srh;
             }
           } catch (histErr: any) {
-            console.warn("[FormsService] Could not fetch workflow history from Supabase:", histErr.message || histErr);
+            console.warn("[FormsService] Could not fetch service_request_history from Supabase:", histErr?.message || histErr);
           }
 
           return {
