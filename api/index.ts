@@ -68,8 +68,11 @@ async function bootstrapServer(): Promise<Express> {
 }
 
 export default async function handler(req: Request, res: Response) {
+  // Ensure the request URL maintains the /api prefix expected by NestJS controllers
+  if (req.url && !req.url.startsWith("/api") && !req.url.startsWith("/api/")) {
+    req.url = req.url.startsWith("/") ? `/api${req.url}` : `/api/${req.url}`;
+  }
   console.log(`[VERCEL_API] Incoming request: ${req.method} ${req.url}`);
   const server = await bootstrapServer();
   return server(req, res);
 }
-//test to redeploy

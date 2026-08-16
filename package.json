@@ -1,16 +1,16 @@
 {
   "name": "react-example",
+  "type": "module",
   "private": true,
   "version": "0.0.0",
   "scripts": {
     "dev": "tsx src/server/main.ts",
-    "build": "vite build && tsc -p tsconfig.server.json",
+    "build": "vite build && tsc -p tsconfig.server.json && node -e \"import fs from 'node:fs'; fs.writeFileSync('dist/server/package.json', JSON.stringify({type:'commonjs'}));\"",
     "start": "node dist/server/main.js",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },
-  
   "dependencies": {
     "@google/genai": "^1.50.0",
     "@nestjs/common": "^11.1.17",
