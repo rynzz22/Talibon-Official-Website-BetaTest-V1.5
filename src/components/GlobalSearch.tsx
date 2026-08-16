@@ -88,6 +88,7 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose }) => {
           .from("news")
           .select("id, title, summary, date, category")
           .is("barangay_id", null)
+          .is("deleted_at", null)
           .or(`title.ilike.%${q}%,summary.ilike.%${q}%`)
           .limit(8),
         supabase

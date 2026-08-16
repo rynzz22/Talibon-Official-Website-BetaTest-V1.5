@@ -125,6 +125,7 @@ const NewsCategoryPage: React.FC = () => {
           .select('*')
           .eq('category', firestoreCategory)
           .is('barangay_id', null) // Main site only shows municipal news
+          .is('deleted_at', null)
           .order('date', { ascending: false });
 
         if (error) {

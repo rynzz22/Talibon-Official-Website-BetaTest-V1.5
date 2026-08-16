@@ -2,49 +2,45 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Calendar, User, ArrowLeft, Loader2, Share2, Bookmark, Printer, ShieldCheck, Clock, Tag, Check, ArrowRight, Building2 } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
-
-interface NewsItem {
-  id: string;
-  title: string;
-  content: string;
-  summary: string;
-  category: string;
-  image_url: string;
-  date: string;
-  author?: string;
-}
+import { newsService } from '../services/newsService';
+import { NewsItem } from '../services/cmsService';
 
 const MOCK_NEWS_DETAILS: Record<string, NewsItem> = {
   "1": {
     id: "1",
+    slug: "talibon-annual-festival-parade",
     title: "Talibon Celebrates Annual Festival with Vibrant Cultural Parade",
     content: "The vibrant coastal town of Talibon came alive today as the community celebrated its annual patronal festival. Local schools, civic organizations, and barangay groups lined the streets in spectacular costumes showcasing Boholano heritage and modern progress.\n\nThe municipal leadership commended the volunteers and security personnel for a safe and deeply enriching celebration that attracted tourists from neighboring towns.\n\nMayor and LGU officials highlighted that this year's festival emphasized coastal conservation and youth participation, setting a precedent for sustainable municipal cultural activities in the province.",
     summary: "The municipality of Talibon marks its historic community celebration with a spectacular parade highlighting local culture, heritage, and unity.",
     category: "Events",
     image_url: "https://picsum.photos/seed/festival/1200/800",
     date: new Date().toISOString(),
-    author: "LGU Media Relations"
+    author: "LGU Media Relations",
+    status: "published"
   },
   "2": {
     id: "2",
+    slug: "public-health-program-coastal-barangays",
     title: "New Public Health Program Launched for Coastal Barangays",
     content: "In an effort to bring quality healthcare directly to the community, the local government unit of Talibon launched 'LGU Kalusugan'. The program deploys a team of physicians, dentists, nurses, and pharmacists to remote island barangays.\n\nOver 500 residents received free physical checkups, dental extractions, diagnostic screenings, and maintenance medicines during the first leg of the mission.\n\nThe Municipal Health Office (MHO) announced that monthly schedules for coastal health visits will now be posted across all municipal communication channels and barangay halls.",
     summary: "LGU Talibon extends comprehensive medical services, checkups, and educational seminars to remote island and coastal communities.",
     category: "Health",
     image_url: "https://picsum.photos/seed/health/1200/800",
     date: new Date(Date.now() - 86400000).toISOString(),
-    author: "LGU Health Division"
+    author: "LGU Health Division",
+    status: "published"
   },
   "3": {
     id: "3",
+    slug: "sea-wall-extension-completion",
     title: "Infrastructure Update: Sea Wall Extension Nears Completion",
     date: new Date(Date.now() - 172800000).toISOString(),
     category: "Infrastructure",
     summary: "The defense infrastructure project along the coastal zone is on schedule, ensuring safety and climate resilience for shoreline residents.",
     content: "Construction of the 500-meter shoreline sea wall extension is now 90% complete, according to the municipal engineering office. This project aims to shield low-lying coastal neighborhoods from tidal surges during the typhoon season.\n\nLocal residents expressed their relief and gratitude, noting that the sea wall has already proven effective during high tides last month.\n\nThe Municipal Engineering Office confirms that final turn-over and ribbon cutting are slated for the upcoming month.",
     image_url: "https://picsum.photos/seed/infra/1200/800",
-    author: "Municipal Engineering Office"
+    author: "Municipal Engineering Office",
+    status: "published"
   }
 };
 
@@ -58,47 +54,24 @@ const NewsDetailPage: React.FC = () => {
 
   useEffect(() => {
     const fetchItem = async () => {
-      if (!id) return;
-      setLoading(true);
-
-      if (!isSupabaseConfigured) {
-        setItem(MOCK_NEWS_DETAILS[id] || {
-          id: id,
-          title: "Talibon Municipal Green Initiative & Streamlining of Operations",
-          content: "The local government unit of Talibon has officially launched its unified municipal management portal, designed to serve the community with high efficiency, transparency, and digital integration. Residents can now access citizen charters, municipal services, official announcements, and executive profiles smoothly from any device.\n\nThis marks a significant milestone in our commitment to transparent and progressive governance. Key departmental heads have undergone comprehensive digital orientation to ensure prompt response times and streamlined processing of public requests.\n\nCitizens are encouraged to utilize the online service portal for e-clearances, business permits, and feedback submission, drastically reducing waiting times at the municipal hall.",
-          summary: "Talibon launches a new unified public portal, improving communication, public transparency, and digital citizen services.",
-          category: "OFFICIAL ARTICLE",
-          image_url: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&q=80&w=1200",
-          date: new Date().toISOString(),
-          author: "Office of the Mayor"
-        });
+      if (!id) {
         setLoading(false);
         return;
       }
+      setLoading(true);
 
       try {
-        const { data, error } = await supabase
-          .from('news')
-          .select('*, profiles:author_id(full_name, role)')
-          .eq('id', id)
-          .maybeSingle();
-
-        if (error) {
-          console.warn("Error fetching news detail:", error);
-          setItem(MOCK_NEWS_DETAILS[id] || null);
-        } else if (data) {
-          const authorDisplay = (data as any).profiles?.full_name 
-            ? `${(data as any).profiles.full_name}${(data as any).profiles.role ? ` (${(data as any).profiles.role})` : ''}` 
-            : data.author || 'Talibon LGU';
-          setItem({
-            ...data,
-            author: authorDisplay
-          } as NewsItem);
+        console.log(`[NewsDetailPage] Loading article for identifier: "${id}"`);
+        const found = await newsService.getNewsById(id);
+        if (found) {
+          setItem(found);
+        } else if (MOCK_NEWS_DETAILS[id]) {
+          setItem(MOCK_NEWS_DETAILS[id]);
         } else {
-          setItem(MOCK_NEWS_DETAILS[id] || null);
+          setItem(null);
         }
-      } catch (err) {
-        console.warn("Exception while fetching news detail from Supabase, falling back to Mock:", err);
+      } catch (err: any) {
+        console.warn("[NewsDetailPage] Failed to fetch news detail:", err.message || err);
         setItem(MOCK_NEWS_DETAILS[id] || null);
       } finally {
         setLoading(false);

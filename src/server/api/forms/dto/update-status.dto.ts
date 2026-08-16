@@ -3,7 +3,9 @@ import {
   IsNotEmpty,
   IsOptional,
   IsBoolean,
-  MaxLength
+  IsArray,
+  MaxLength,
+  ArrayMaxSize
 } from "class-validator";
 
 export class UpdateStatusDto {
@@ -23,5 +25,15 @@ export class UpdateStatusDto {
 
   @IsOptional()
   @IsBoolean()
+  notifyEmail?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   saveTimeline?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  requirements?: string[];
 }

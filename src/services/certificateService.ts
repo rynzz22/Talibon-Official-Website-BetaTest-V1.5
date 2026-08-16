@@ -498,7 +498,7 @@ export const certificateService = {
   },
 
   /**
-   * Transition request status and log updates directly in Supabase
+   * Transition request status and log updates directly in Supabase & NestJS API
    */
   async updateRequestStatus(
     requestId: string,
@@ -509,6 +509,42 @@ export const certificateService = {
     notifySms: boolean = false,
     saveTimeline: boolean = true
   ): Promise<boolean> {
+    // 1. First attempt authoritative NestJS backend API (which securely dispatches server-side email notifications)
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json"
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`/api/forms/certificate/${encodeURIComponent(requestId)}/status`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          status,
+          remarks,
+          notifyCitizen: true,
+          notifyEmail,
+          saveTimeline
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result && result.success) {
+          await logCmsAction(userEmail, `UPDATE_STATUS_${status}`, "certificate_requests", requestId);
+          return true;
+        }
+      }
+    } catch (apiErr: any) {
+      console.warn("[CertificateService] Server API update error, falling back to direct DB update:", apiErr.message || apiErr);
+    }
+
+    // 2. Direct Supabase Client fallback
     try {
       const dbStatus = mapStatusToDb(status);
       const now = new Date().toISOString();
@@ -559,58 +595,6 @@ export const certificateService = {
       }
 
       await logCmsAction(userEmail, `UPDATE_STATUS_${status}`, "certificate_requests", requestId);
-
-      if (notifyEmail || notifySms) {
-        (async () => {
-          let ticketId = "";
-          let recipientEmail = "";
-          let recipientName = "";
-          let documentType = "";
-          let recipientMobile = "";
-
-          try {
-            const { data: requestDetails, error: fetchErr } = await supabase
-              .from("certificate_requests")
-              .select("ticket_id, document_type, full_name, email, mobile_number")
-              .eq("id", requestId)
-              .maybeSingle();
-
-            if (fetchErr) throw fetchErr;
-            if (!requestDetails) throw new Error("Request details not found in database");
-
-            ticketId = requestDetails.ticket_id || "";
-            recipientEmail = requestDetails.email || "";
-            recipientName = requestDetails.full_name || "";
-            documentType = requestDetails.document_type || "";
-            recipientMobile = requestDetails.mobile_number || "";
-
-            const { data: edgeData, error: edgeError } = await supabase.functions.invoke("send-status-email", {
-              body: {
-                requestId,
-                ticketId,
-                status: dbStatus,
-                remarks: remarks || "",
-                recipientEmail,
-                recipientName,
-                documentType,
-                recipientMobile,
-                notifyEmail,
-                notifySms
-              }
-            });
-
-            if (edgeError) throw edgeError;
-
-            if (notifyEmail && edgeData?.success) {
-              await logEmailAttempt(userEmail, "EMAIL_SENT", requestId, ticketId, recipientEmail, dbStatus);
-            } else if (notifyEmail) {
-              await logEmailAttempt(userEmail, "EMAIL_FAILED", requestId, ticketId, recipientEmail, dbStatus, edgeData?.error || "Unknown edge error");
-            }
-          } catch (err: any) {
-            console.warn("[CertificateService] Async notification dispatcher failed:", err.message || err);
-          }
-        })();
-      }
 
       return true;
     } catch (e: any) {
