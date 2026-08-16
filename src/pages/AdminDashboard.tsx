@@ -3527,12 +3527,12 @@ const AdminDashboard: React.FC = () => {
                       <div className="space-y-6">
                         {/* DYNAMIC REQUIREMENTS LIST */}
                         <div className="space-y-3 p-6 bg-gray-50 rounded-3xl border border-gray-100">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Requirements Checklist</label>
-                          <p className="text-[10px] text-gray-400 font-bold mb-2">List any mandatory documents or credentials the citizen must bring or upload.</p>
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Requirements Checklist / Additional Requirements</label>
+                          <p className="text-[10px] text-gray-400 font-bold mb-2">List any mandatory documents, IDs, or additional requirements the citizen must bring or submit.</p>
                           <div className="flex gap-2">
                             <input
                               type="text"
-                              placeholder="e.g. Barangay Clearance (Original)"
+                              placeholder="e.g. Please bring a valid government-issued ID and a photocopy."
                               value={tempReqInput}
                               onChange={(e) => setTempReqInput(e.target.value)}
                               className="grow bg-white border border-gray-200 rounded-xl py-3 px-4 font-bold text-gray-900 focus:outline-none text-xs"

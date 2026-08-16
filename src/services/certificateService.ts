@@ -2,6 +2,13 @@ import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { logCmsAction } from "./cmsService";
 import { isMockAllowed } from "../lib/mode";
 
+export interface TimelineEvent {
+  id?: string;
+  status: string;
+  remarks: string | null;
+  createdAt: string;
+}
+
 export interface CertificateRequest {
   id?: string;
   ticketId: string;
@@ -16,12 +23,7 @@ export interface CertificateRequest {
   status: string;
   created_at?: string;
   updated_at?: string;
-  history?: {
-    id?: string;
-    status: string;
-    remarks: string | null;
-    createdAt: string;
-  }[];
+  history?: TimelineEvent[];
 }
 
 // Local Storage key for fallback requests when Supabase is unreachable or for citizen tracking convenience

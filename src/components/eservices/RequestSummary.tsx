@@ -7,6 +7,7 @@ interface RequestSummaryProps {
   ticketId: string;
   submittedAt?: string;
   compact?: boolean;
+  requirements?: string[];
 }
 
 export const RequestSummary: React.FC<RequestSummaryProps> = ({
@@ -14,7 +15,8 @@ export const RequestSummary: React.FC<RequestSummaryProps> = ({
   purposeJson,
   ticketId,
   submittedAt,
-  compact = false
+  compact = false,
+  requirements = []
 }) => {
   // Safe parsing helper
   const parseData = (): { purposeText?: string; form_data?: Record<string, any> } => {
@@ -720,6 +722,26 @@ export const RequestSummary: React.FC<RequestSummaryProps> = ({
         <div className="bg-slate-50/70 rounded-xl p-3 border border-slate-100">
           {renderDocumentFields()}
         </div>
+
+        {/* Dynamic Database Requirements / Notes */}
+        {requirements && requirements.length > 0 && (
+          <div className="bg-amber-50/60 rounded-xl p-3 border border-amber-200/60 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-amber-800">
+              <FileCheck size={12} className="shrink-0 text-amber-600" />
+              <span className="text-[9px] font-black uppercase tracking-wider">
+                Service Requirements Checklist
+              </span>
+            </div>
+            <ul className="space-y-1 pl-1">
+              {requirements.map((req, idx) => (
+                <li key={idx} className="text-xs text-slate-800 font-medium flex items-start gap-1.5">
+                  <span className="text-amber-600 font-bold leading-none">•</span>
+                  <span className="leading-tight">{req}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* Official Footnote */}
