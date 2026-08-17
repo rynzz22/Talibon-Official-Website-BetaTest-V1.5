@@ -170,39 +170,6 @@ function mapStatusToDb(status: string): string {
   return "Submitted";
 }
 
-// Helper to log email notification attempts inside audit_logs table
-async function logEmailAttempt(
-  userEmail: string,
-  action: "EMAIL_SENT" | "EMAIL_FAILED",
-  requestId: string,
-  ticketId: string,
-  recipient: string,
-  status: string,
-  errorMessage?: string
-): Promise<void> {
-  const email = userEmail || "system@talibon.gov.ph";
-  const dataPayload = {
-    request_id: requestId,
-    ticket_id: ticketId,
-    recipient: recipient,
-    status: status,
-    ...(errorMessage ? { error_message: errorMessage } : {})
-  };
-
-  try {
-    const { error } = await supabase.from("audit_logs").insert([{
-      user_email: email,
-      action: action as any,
-      target_table: "certificate_requests",
-      target_id: requestId,
-      new_data: dataPayload
-    }]);
-    if (error) throw error;
-  } catch (err: any) {
-    console.warn("[CertificateService] Failed to insert email audit log:", err.message || err);
-  }
-}
-
 export const certificateService = {
   /**
    * Submit a certificate request directly to public.certificate_requests
@@ -255,19 +222,6 @@ export const certificateService = {
         throw new Error(crError?.message || srError?.message || "Failed to save application to database.");
       }
       createdData = srData;
-    }
-
-    // Insert initial history record if supported
-    if (createdData?.id) {
-      try {
-        await supabase.from("service_request_history").insert({
-          request_id: createdData.id,
-          status: "Submitted",
-          remarks: "Application received and registered in municipal e-services queue."
-        });
-      } catch (srhErr: any) {
-        // Handled silently if client lacks direct table insert permissions (managed by backend)
-      }
     }
 
     const mapped = mapDbToRequest(createdData, [{
@@ -457,7 +411,7 @@ export const certificateService = {
   },
 
   /**
-   * Transition request status and log updates directly in Supabase & NestJS API
+   * Transition request status and log updates directly via authoritative NestJS API
    */
   async updateRequestStatus(
     requestId: string,
@@ -468,7 +422,6 @@ export const certificateService = {
     notifySms: boolean = false,
     saveTimeline: boolean = true
   ): Promise<boolean> {
-    // 1. First attempt authoritative NestJS backend API (which securely dispatches server-side email notifications)
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
@@ -498,74 +451,14 @@ export const certificateService = {
           await logCmsAction(userEmail, `UPDATE_STATUS_${status}`, "certificate_requests", requestId);
           return true;
         }
+      } else {
+        const errText = await response.text();
+        console.warn(`[CertificateService] Server status update failed (HTTP ${response.status}):`, errText);
       }
     } catch (apiErr: any) {
-      console.warn("[CertificateService] Server API update error, falling back to direct DB update:", apiErr.message || apiErr);
+      console.warn("[CertificateService] Server API update error:", apiErr.message || apiErr);
     }
 
-    // 2. Direct Supabase Client fallback
-    try {
-      const dbStatus = mapStatusToDb(status);
-      const now = new Date().toISOString();
-
-      let updateError: any = null;
-
-      const { error: srError } = await supabase
-        .from("service_requests")
-        .update({
-          status: dbStatus as any,
-          updated_at: now
-        })
-        .eq("id", requestId);
-
-      if (srError) {
-        const { error: crError } = await supabase
-          .from("certificate_requests")
-          .update({
-            status: dbStatus as any
-          })
-          .eq("id", requestId);
-
-        updateError = crError;
-      }
-
-      if (saveTimeline) {
-        try {
-          await supabase.from("service_request_history").insert({
-            request_id: requestId,
-            status: dbStatus,
-            remarks: remarks || `Status updated to ${status}`
-          });
-        } catch {
-          // Handled if client lacks direct table insert permissions
-        }
-      }
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      await logCmsAction(userEmail, `UPDATE_STATUS_${status}`, "certificate_requests", requestId);
-
-      return true;
-    } catch (e: any) {
-      console.warn("[CertificateService] updateRequestStatus remote update failed, updating local fallback:", e.message || e);
-      // Fallback: update in local storage if present
-      const localReqs = getLocalRequests();
-      const localMatch = localReqs.find(r => r.id === requestId || r.ticketId === requestId);
-      if (localMatch) {
-        localMatch.status = status;
-        localMatch.history = localMatch.history || [];
-        localMatch.history.unshift({
-          id: "hist-" + Date.now(),
-          status: status,
-          remarks: remarks || `Status updated to ${status}`,
-          createdAt: new Date().toISOString()
-        });
-        saveLocalRequest(localMatch);
-        return true;
-      }
-    }
     return false;
   }
 };

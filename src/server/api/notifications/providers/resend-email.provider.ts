@@ -10,8 +10,8 @@ export class ResendEmailProvider implements EmailProvider {
 
   constructor() {
     this.apiKey = (process.env.RESEND_API_KEY || "").trim();
-    this.defaultFrom = (process.env.EMAIL_FROM_ADDRESS || "notifications@talibon.gov.ph").trim();
-    this.defaultFromName = (process.env.EMAIL_FROM_NAME || "Municipality of Talibon").trim();
+    this.defaultFrom = (process.env.EMAIL_FROM_ADDRESS || "onboarding@resend.dev").trim();
+    this.defaultFromName = (process.env.EMAIL_FROM_NAME || "Digital Talibon").trim();
 
     // Safe environment presence check (never logs secret values)
     const hasKey = !!this.apiKey && this.apiKey.length > 5;
