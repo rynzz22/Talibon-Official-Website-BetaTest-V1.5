@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
+import { HashLink } from "react-router-hash-link";
 import { motion, AnimatePresence } from "motion/react";
 import {
   FileText, CheckCircle2, Clock, AlertCircle, Search, ArrowRight, Check,
@@ -149,7 +150,7 @@ export default function EServicesPage() {
   const scrollToContent = (smooth = true) => {
     setTimeout(() => {
       if (contentRef.current) {
-        const navbarHeight = window.innerWidth >= 1024 ? 130 : 90;
+        const navbarHeight = window.innerWidth >= 1024 ? 150 : 100;
         const elementPosition = contentRef.current.getBoundingClientRect().top + window.pageYOffset;
         const offsetPosition = elementPosition - navbarHeight;
         window.scrollTo({
@@ -159,7 +160,7 @@ export default function EServicesPage() {
       } else {
         const el = document.getElementById("eservices-content");
         if (el) {
-          const navbarHeight = window.innerWidth >= 1024 ? 130 : 90;
+          const navbarHeight = window.innerWidth >= 1024 ? 150 : 100;
           const elementPosition = el.getBoundingClientRect().top + window.pageYOffset;
           const offsetPosition = elementPosition - navbarHeight;
           window.scrollTo({
@@ -191,7 +192,7 @@ export default function EServicesPage() {
       }
       scrollToContent(true);
     } else {
-      scrollToContent(true);
+      window.scrollTo({ top: 0, behavior: "instant" });
     }
   }, [searchParams]);
 
@@ -582,28 +583,66 @@ export default function EServicesPage() {
         />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
+      <div className="relative z-10 w-full px-4 sm:px-6 md:px-8 lg:px-10 xl:px-14 pt-4 sm:pt-6">
         {/* Header Hero */}
-        <div className="text-center mb-16 space-y-4">
-          <div className="flex items-center justify-center gap-2 mb-2 text-brand-primary">
+        <div className="text-center mb-6 sm:mb-8 space-y-3">
+          <div className="flex items-center justify-center gap-2 mb-1 text-brand-primary">
             <Sparkles size={15} />
             <span className="text-[11px] font-extrabold uppercase tracking-widest">
               LGU Digitalization Suite
             </span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-black text-brand-text tracking-tight uppercase font-display leading-snug">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-brand-text tracking-tight uppercase font-display leading-snug">
             E-SERVICES HUB
           </h1>
-          <p className="text-base text-brand-muted font-medium max-w-2xl mx-auto leading-relaxed">
+          <p className="text-sm sm:text-base text-brand-muted font-medium max-w-3xl mx-auto leading-relaxed">
             A secure, interactive citizen municipal portal for Talibon Bohol's digital certificate workflow. Request certificates, attach documents, and track approval status in real-time.
           </p>
         </div>
 
+        {/* Navigation & Breadcrumb Header Bar - Positioned above Available Digital Services */}
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs mb-6 sm:mb-8">
+          <HashLink
+            to="/#popular-services"
+            scroll={(el) => {
+              const yOffset = -130;
+              const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+              window.scrollTo({ top: y, behavior: 'smooth' });
+            }}
+            className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-brand-primary text-white hover:bg-brand-primary/90 font-bold text-xs uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
+          >
+            <ArrowLeft size={16} className="shrink-0" />
+            <span>Back to Online Services</span>
+          </HashLink>
+
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <Link to="/" className="text-slate-400 hover:text-brand-primary">Home</Link>
+            <span className="text-slate-300">/</span>
+            <HashLink 
+              to="/#popular-services" 
+              scroll={(el) => {
+                const yOffset = -130;
+                const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                window.scrollTo({ top: y, behavior: 'smooth' });
+              }}
+              className="text-slate-400 hover:text-brand-primary font-semibold"
+            >
+              Online Services
+            </HashLink>
+            <span className="text-slate-300">/</span>
+            <span className="font-bold text-slate-800 uppercase tracking-wide">
+              {activeService === "directory" 
+                ? "E-Services Hub" 
+                : activeService.replace(/_/g, " ").toUpperCase()}
+            </span>
+          </div>
+        </div>
+
         {/* Core Layout Grid */}
-        <div ref={contentRef} id="eservices-content" className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start scroll-mt-32">
+        <div ref={contentRef} id="eservices-content" className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start scroll-mt-36">
           
           {/* LEFT SIDE: Citizen Service Desk (E-Services Selector and Forms) */}
-          <div className="lg:col-span-6 xl:col-span-6 space-y-8">
+          <div className="lg:col-span-7 xl:col-span-7 space-y-8">
             <AnimatePresence mode="wait">
               {activeService === "directory" ? (
                 <motion.div
@@ -613,7 +652,7 @@ export default function EServicesPage() {
                   exit={{ opacity: 0, y: -15 }}
                   className="space-y-6"
                 >
-                  <div className="bg-white border border-brand-border rounded-[2.5rem] p-8 shadow-sm space-y-6">
+                  <div className="bg-white border border-brand-border rounded-[2.5rem] p-6 sm:p-8 shadow-sm space-y-6">
                     <div>
                       <h2 className="text-xl font-black text-brand-text uppercase font-display tracking-tight">Available Digital Services</h2>
                       <p className="text-xs text-brand-muted font-bold uppercase tracking-widest mt-1">Select a municipal service to begin your electronic application</p>
@@ -1010,7 +1049,7 @@ export default function EServicesPage() {
           </div>
 
           {/* RIGHT SIDE: Real-time Status Tracker Card */}
-          <div className="lg:col-span-6 xl:col-span-6 space-y-6">
+          <div className="lg:col-span-5 xl:col-span-5 space-y-6 lg:sticky lg:top-36">
             <div className="bg-white border border-brand-border rounded-2xl p-5 sm:p-6 shadow-xs space-y-5">
               
               <div className="flex items-center justify-between">
