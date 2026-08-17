@@ -38,12 +38,10 @@ export class TransparencyService {
   getBudget() {
     return {
       title: "Budget and Finances",
-      annualBudget: "150M",
-      breakdown: [
-        { category: "Social Services", amount: "60M" },
-        { category: "Economic Services", amount: "40M" },
-        { category: "General Public Services", amount: "50M" },
-      ],
+      annualBudget: "TO BE POSTED",
+      status: "TO BE POSTED",
+      breakdown: [],
+      message: "The approved annual budget, appropriation ordinances, and financial allocations for the current fiscal year are currently being finalized and will be posted upon official certification from the Municipal Budget Office and the Sangguniang Bayan.",
     };
   }
 
