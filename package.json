@@ -45,6 +45,8 @@
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^22.13.4",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@types/react-router-hash-link": "^2.4.9",
     "autoprefixer": "^10.4.20",
     "tailwindcss": "^4.0.7",
