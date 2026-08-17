@@ -362,7 +362,37 @@ export const transparencyApi = {
     return api.get("content", API_ENDPOINTS.TRANSPARENCY.FINANCE_REPORTS);
   },
   getExecutiveOrders: () => api.get("content", API_ENDPOINTS.TRANSPARENCY.EXECUTIVE_ORDERS),
-  getBudget: () => api.get("content", API_ENDPOINTS.TRANSPARENCY.BUDGET),
+  getBudget: async () => {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from("transparency_documents")
+          .select("*")
+          .eq("category", "budget")
+          .eq("status", "published")
+          .order("created_at", { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          return {
+            title: "Budget and Finances",
+            annualBudget: "OFFICIAL DOCUMENTS AVAILABLE",
+            status: "PUBLISHED",
+            documents: data,
+            breakdown: [],
+          };
+        }
+      } catch (err) {
+        console.warn("[transparencyApi] Live budget fetch fallback:", err);
+      }
+    }
+    return {
+      title: "Budget and Finances",
+      annualBudget: "TO BE POSTED",
+      status: "TO BE POSTED",
+      breakdown: [],
+      message: "The approved annual budget, appropriation ordinances, and financial allocation summaries are currently being prepared for posting by the Municipal Budget Office in compliance with the DILG Full Disclosure Policy."
+    };
+  },
   getBiddings: () => api.get("content", API_ENDPOINTS.TRANSPARENCY.BIDDINGS),
 };
 
