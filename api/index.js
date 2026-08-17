@@ -40,7 +40,6 @@ function getSupabaseClient() {
     return null;
   }
 }
-//added this to retry push
 var AboutService = class {
   getProfile() {
     return {
