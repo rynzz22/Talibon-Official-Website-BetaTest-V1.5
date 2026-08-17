@@ -42,8 +42,8 @@ export const ServiceStatusBadge: React.FC<ServiceStatusBadgeProps> = ({ status }
   const config = getStatusConfig();
 
   return (
-    <div className={`inline-flex items-center px-4 py-2 rounded-full border text-xs font-black uppercase tracking-wider ${config.bg} shadow-sm transition-all duration-300 hover:scale-[1.02]`}>
-      <span className={`w-2 h-2 rounded-full mr-2.5 ${config.dot}`} />
+    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${config.bg} shadow-2xs`}>
+      <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${config.dot}`} />
       {config.icon}
       {config.text}
     </div>
