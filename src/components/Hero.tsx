@@ -5,9 +5,9 @@ import { Link } from "react-router-dom";
 
 import { useLanguage } from "../contexts/LanguageContext";
 
-interface HeroProps {
-  overrideTitle?: string;
-  overrideSubtitle?: string;
+interface HeroProps { 
+  overrideTitle?: string;  
+  overrideSubtitle?: string; 
 }
 
 const OFFICIAL_TALIBON_VIDEO_URL = "https://talibon.gov.ph/wp-content/uploads/2025/11/AQNfA76VxqBsdOkCQGUI91qEDtBLVfxVALb-H9LBY6HdxHPZYsDhTPqmq4uncItBA1u5CUFmq7KAQA3usI2om9XI_dJCwqeJLyINzeVU7fug1A.mp4";
@@ -28,6 +28,63 @@ const Hero: React.FC<HeroProps> = ({ overrideTitle, overrideSubtitle }) => {
     }
   }, [isMuted]);
 
+  // Dedicated useEffect to explicitly manage video mount, load, play, and lifecycle events
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Enforce muted property and defaultMuted for strict browser autoplay compliance
+    video.muted = true;
+    video.defaultMuted = true;
+
+    const attemptPlay = () => {
+      if (!video) return;
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            // Playback started
+          })
+          .catch((err) => {
+            console.warn('[Hero Video] Playback failed or prevented by browser autoplay policy:', err?.message || err);
+          });
+      }
+    };
+
+    const handleLoadedMetadata = () => {
+      attemptPlay();
+    };
+
+    const handleCanPlay = () => {
+      attemptPlay();
+    };
+
+    const handleVideoError = () => {
+      const mediaError = video.error;
+      console.warn('[Hero Video] Media error detected:', {
+        code: mediaError?.code,
+        message: mediaError?.message || 'Unknown media error'
+      });
+    };
+
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('error', handleVideoError);
+
+    try {
+      video.load();
+      attemptPlay();
+    } catch (e) {
+      console.warn('[Hero Video] Error during initial video load/play attempt:', e);
+    }
+
+    return () => {
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('error', handleVideoError);
+    };
+  }, []);
+
   // IntersectionObserver to detect when Hero section is in view vs scrolled away
   useEffect(() => {
     const sectionEl = sectionRef.current;
@@ -47,16 +104,28 @@ const Hero: React.FC<HeroProps> = ({ overrideTitle, overrideSubtitle }) => {
             setIsMuted(true);
             window.dispatchEvent(new CustomEvent('hero-audio-sync', { detail: { muted: true } }));
           } else {
-            // User scrolled back into Hero section -> restore audio if user enabled it
-            if (userWantsAudioRef.current && videoRef.current) {
-              videoRef.current.muted = false;
-              videoRef.current.play().then(() => {
-                setIsMuted(false);
-                window.dispatchEvent(new CustomEvent('hero-audio-sync', { detail: { muted: false } }));
-              }).catch(() => {
-                setIsMuted(true);
-                window.dispatchEvent(new CustomEvent('hero-audio-sync', { detail: { muted: true } }));
-              });
+            // User scrolled back into Hero section -> restore audio if user enabled it, or resume playback while muted
+            if (videoRef.current) {
+              if (userWantsAudioRef.current) {
+                videoRef.current.muted = false;
+                videoRef.current.play().then(() => {
+                  setIsMuted(false);
+                  window.dispatchEvent(new CustomEvent('hero-audio-sync', { detail: { muted: false } }));
+                }).catch((err) => {
+                  console.warn('[Hero Video] Playback with audio failed, recovering with muted playback:', err?.message || err);
+                  if (videoRef.current) {
+                    videoRef.current.muted = true;
+                    videoRef.current.play().catch(() => {});
+                  }
+                  setIsMuted(true);
+                  window.dispatchEvent(new CustomEvent('hero-audio-sync', { detail: { muted: true } }));
+                });
+              } else {
+                videoRef.current.muted = true;
+                videoRef.current.play().catch((err) => {
+                  console.warn('[Hero Video] Muted playback resume failed on re-entering view:', err?.message || err);
+                });
+              }
             }
           }
         });
@@ -109,6 +178,13 @@ const Hero: React.FC<HeroProps> = ({ overrideTitle, overrideSubtitle }) => {
           muted={isMuted}
           loop
           playsInline
+          onError={(e) => {
+            const videoEl = e.currentTarget;
+            console.warn('[Hero Video] Video element onError event triggered:', {
+              code: videoEl.error?.code,
+              message: videoEl.error?.message
+            });
+          }}
           className="w-full h-full object-cover object-center min-w-full min-h-full scale-[1.01]"
         >
           <source 
