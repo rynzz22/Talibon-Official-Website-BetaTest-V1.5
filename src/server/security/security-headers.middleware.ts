@@ -24,6 +24,7 @@ export class SecurityHeadersMiddleware implements NestMiddleware {
     // Content Security Policy
     const csp = [
       "default-src 'self'",
+      "media-src 'self' data: blob: https: http: https://talibon.gov.ph https://*.talibon.gov.ph",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://connect.facebook.net",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
